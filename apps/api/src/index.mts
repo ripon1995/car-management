@@ -1,13 +1,17 @@
 import express  from 'express';
-import pico from 'picocolors';
 import type {Request, Response} from 'express';
 import picocolors from 'picocolors';
+import logger from './utils/logger.js';
 
 const app = express();
 const PORT = 8000;
 
 // Middleware
 app.use(express.json());
+app.use((req: Request, _res: Response, next) => {
+  logger.info(`${req.method} ${req.url}`);
+  next();
+});
 
 // Health check route
 app.get('/health', (req: Request, res: Response) => {

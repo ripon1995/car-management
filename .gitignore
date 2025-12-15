@@ -1,11 +1,51 @@
+# OS / Editor
 .DS_Store
-node_modules
-.turbo
-*.log
-dist
-dist-ssr
-*.local
+Thumbs.db
+*.swp
+*~
+
+# Node / pnpm
+node_modules/
+.pnpm-store/
+.pnpm-debug.log*
+
+# Turborepo
+.turbo/
+
+# Build outputs
+dist/
+*.tsbuildinfo
+
+# Apps specific builds
+apps/api/dist/
+apps/web/dist/
+apps/web/.vite/
+
+# Environment variables
 .env
-.cache
-server/dist
-public/dist
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Vite / TypeScript cache
+.cache/
+.vite/
+
+# IDE / Editor
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Firebase (if you add service account later)
+firebase-service-account.json
+*.firebase.json

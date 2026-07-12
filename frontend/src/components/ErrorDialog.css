@@ -1,0 +1,60 @@
+.error-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(16, 24, 40, 0.45);
+  padding: 16px;
+  z-index: 100;
+}
+
+.error-dialog {
+  width: 100%;
+  max-width: 360px;
+  padding: 24px;
+  background: var(--surface);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+
+.error-dialog-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 12px;
+  border-radius: 50%;
+  background: rgba(208, 59, 59, 0.1);
+  color: var(--status-critical);
+}
+
+.error-dialog h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.error-dialog-detail {
+  color: var(--text);
+  font-size: 15px;
+}
+
+.error-dialog-meta {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--text);
+  opacity: 0.7;
+}
+
+.error-dialog-close {
+  margin-top: 18px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}

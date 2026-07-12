@@ -1,0 +1,126 @@
+.car-owners-page {
+  align-items: stretch;
+  text-align: left;
+  width: 100%;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+.car-owner-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 420px;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.car-owner-form h2 {
+  margin: 0;
+}
+
+.car-owner-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 15px;
+  color: var(--text-h);
+}
+
+.car-owner-form input {
+  font: inherit;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-h);
+}
+
+.car-owner-form input:focus {
+  outline: 2px solid var(--accent-border);
+  outline-offset: 1px;
+}
+
+.car-owner-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.car-owner-form-actions button {
+  font: inherit;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.car-owner-form-actions button[type='submit'] {
+  background: var(--accent);
+  color: #fff;
+}
+
+.car-owner-form-actions button.secondary {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-h);
+}
+
+.car-owner-form-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.car-owners-table-wrap {
+  overflow-x: auto;
+}
+
+.car-owners-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.car-owners-table th,
+.car-owners-table td {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  font-size: 15px;
+}
+
+.car-owners-table th {
+  color: var(--text);
+  font-weight: 500;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.car-owners-table tr:last-child td {
+  border-bottom: none;
+}
+
+.car-owners-table-actions {
+  display: flex;
+  gap: 14px;
+  justify-content: flex-end;
+}
+
+.car-owners-table button.link {
+  font: inherit;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.car-owners-table button.link.danger {
+  color: var(--status-critical);
+}

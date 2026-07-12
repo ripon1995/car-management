@@ -75,7 +75,8 @@
 
 .data-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   text-align: left;
 }
 
@@ -103,11 +104,20 @@
 }
 
 .data-table tbody tr {
-  transition: background-color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
 }
 
 .data-table tbody tr:hover {
   background-color: var(--accent-bg);
+  box-shadow:
+    rgba(16, 24, 40, 0.14) 0 16px 24px -6px,
+    rgba(16, 24, 40, 0.08) 0 6px 10px -3px;
+  transform: translateY(-3px);
+  position: relative;
+  z-index: 1;
 }
 
 .data-table-actions {

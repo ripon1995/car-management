@@ -178,26 +178,34 @@ remaining features.
     `"Add car owner"`). Reuse for every page's main create action.
   - `.card` — generic surface (`var(--surface)` bg, border, shadow,
     rounded corners) for panels/tables/detail views.
-- List pages render records in a `.card`-wrapped `<table>` (see
-  `CarOwnersPage.css` `.car-owners-table*` rules) with per-row `Edit`/
-  `Delete` as plain `button.link` (accent) / `button.link.danger`
-  (`--status-critical`) — copy this pattern rather than inventing row
-  actions per feature.
-- Create/edit forms are **real modals**, not inline cards: a
-  `.<feature>-modal-backdrop` (fixed inset, centered, semi-transparent,
-  `onClick` closes) wrapping a `.<feature>-form.card`-style panel
+- List pages render records in a full-width `<table className="data-table">`
+  wrapped in `<div className="data-table-wrap card">` — both classes are
+  shared in `App.css`, not per-feature CSS. `.data-table` rows get a
+  background-tint hover transition for free; the last column is always a
+  plain `<th>Action</th>` header containing three `.icon-btn`s per row
+  (`ViewIcon`/`EditIcon`/`DeleteIcon` from `NavIcons.tsx`, delete using
+  `className="icon-btn danger"` for the `--status-critical` hover tint) —
+  copy this exact pattern (see `CarOwnersPage.tsx`) rather than inventing
+  row actions or a text-link style per feature.
+- Create/edit/view forms are **real modals**, not inline cards, using the
+  shared `App.css` classes `.modal-backdrop` (fixed inset, centered,
+  semi-transparent, `onClick` closes) wrapping a `.modal-panel.card` panel
   (`role="dialog"`, `aria-modal`, `aria-labelledby`,
   `onClick={(e) => e.stopPropagation()}` so backdrop clicks don't bubble
-  into the form). Escape key and backdrop click both close it; the first
-  field autofocuses on open (see `CarOwnersPage.tsx`'s `nameInputRef` +
-  the `isFormOpen` effect). Inputs use `placeholder` text as the visible
-  hint instead of a `<label>`, with `aria-label` carrying the same text for
-  accessibility — no visible `<label>` elements in these modals (contrast
-  `AuthForm.css`'s login/register forms, which predate this convention and
-  do use visible labels; don't backport this modal style onto those two
-  pages without being asked). Footer actions split via
-  `justify-content: space-between`: **Cancel bottom-left**, primary
-  submit (`.btn-primary`) **bottom-right**.
+  into the panel). Escape key and backdrop click both close it; the first
+  field autofocuses on open for create/edit (see `CarOwnersPage.tsx`'s
+  `nameInputRef` + the `isFormOpen` effect). Inputs use `placeholder` text
+  as the visible hint instead of a `<label>`, with `aria-label` carrying
+  the same text for accessibility — no visible `<label>` elements in these
+  modals (contrast `AuthForm.css`'s login/register forms, which predate
+  this convention and do use visible labels; don't backport this modal
+  style onto those two pages without being asked). Footer actions use the
+  shared `.modal-actions` class (`justify-content: space-between`):
+  **Cancel/Close bottom-left**, primary action (`.btn-primary`)
+  **bottom-right**. A read-only "view" modal (opened from the table's
+  `ViewIcon`) reuses the same `.modal-backdrop`/`.modal-panel.card` shell
+  with a `<dl className="detail-list">` (shared in `App.css`) instead of
+  form inputs — see `CarOwnersPage.tsx`'s `viewingOwner` modal.
 - `NavIcons.tsx` holds every icon as a small inline-SVG component built
   from the shared `iconProps()` helper (24×24 viewBox, `stroke="currentColor"`,
   `strokeWidth="1.5"`) — add new icons here (e.g. `PlusIcon`) rather than

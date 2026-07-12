@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { CarOwnersIcon, PlusIcon } from '../components/NavIcons'
+import { CarOwnersIcon, PlusIcon, ViewIcon, EditIcon, DeleteIcon } from '../components/NavIcons'
 import ErrorDialog from '../components/ErrorDialog'
 import { ApiError } from '../errors/api'
 import * as api from '../api'
@@ -20,6 +20,7 @@ function CarOwnersPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<CarOwnerInput>(emptyForm)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [viewingOwner, setViewingOwner] = useState<CarOwner | null>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -48,6 +49,7 @@ function CarOwnersPage() {
   }
 
   function openEditForm(owner: CarOwner) {
+    setViewingOwner(null)
     setEditingId(owner.id)
     setForm({ name: owner.name, phone_number: owner.phone_number })
     setIsFormOpen(true)
@@ -69,6 +71,16 @@ function CarOwnersPage() {
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [isFormOpen])
+
+  useEffect(() => {
+    if (!viewingOwner) return
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') setViewingOwner(null)
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [viewingOwner])
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
@@ -115,9 +127,9 @@ function CarOwnersPage() {
       </div>
 
       {isFormOpen && (
-        <div className="car-owner-modal-backdrop" onClick={closeForm}>
+        <div className="modal-backdrop" onClick={closeForm}>
           <form
-            className="car-owner-form"
+            className="modal-panel card"
             role="dialog"
             aria-modal="true"
             aria-labelledby="car-owner-form-title"
@@ -142,7 +154,7 @@ function CarOwnersPage() {
               onChange={(event) => setForm((f) => ({ ...f, phone_number: event.target.value }))}
               required
             />
-            <div className="car-owner-form-actions">
+            <div className="modal-actions">
               <button type="button" className="secondary" onClick={closeForm} disabled={isSubmitting}>
                 Cancel
               </button>
@@ -154,18 +166,58 @@ function CarOwnersPage() {
         </div>
       )}
 
+      {viewingOwner && (
+        <div className="modal-backdrop" onClick={() => setViewingOwner(null)}>
+          <div
+            className="modal-panel card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="car-owner-view-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="car-owner-view-title">{viewingOwner.name}</h2>
+            <dl className="detail-list">
+              <div>
+                <dt>Name</dt>
+                <dd>{viewingOwner.name}</dd>
+              </div>
+              <div>
+                <dt>Phone number</dt>
+                <dd>{viewingOwner.phone_number}</dd>
+              </div>
+              <div>
+                <dt>Created</dt>
+                <dd>{new Date(viewingOwner.created_at).toLocaleString()}</dd>
+              </div>
+              <div>
+                <dt>Last updated</dt>
+                <dd>{new Date(viewingOwner.updated_at).toLocaleString()}</dd>
+              </div>
+            </dl>
+            <div className="modal-actions">
+              <button type="button" className="secondary" onClick={() => setViewingOwner(null)}>
+                Close
+              </button>
+              <button type="button" className="btn-primary" onClick={() => openEditForm(viewingOwner)}>
+                Edit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isLoading ? (
         <p>Loading…</p>
       ) : owners.length === 0 ? (
         <p>No car owners yet.</p>
       ) : (
-        <div className="car-owners-table-wrap card">
-          <table className="car-owners-table">
+        <div className="data-table-wrap card">
+          <table className="data-table">
             <thead>
               <tr>
                 <th>Name</th>
                 <th>Phone number</th>
-                <th aria-label="Actions" />
+                <th>Action</th>
               </tr>
             </thead>
             <tbody>
@@ -173,12 +225,33 @@ function CarOwnersPage() {
                 <tr key={owner.id}>
                   <td>{owner.name}</td>
                   <td>{owner.phone_number}</td>
-                  <td className="car-owners-table-actions">
-                    <button type="button" className="link" onClick={() => openEditForm(owner)}>
-                      Edit
+                  <td className="data-table-actions">
+                    <button
+                      type="button"
+                      className="icon-btn"
+                      aria-label={`View ${owner.name}`}
+                      title="View"
+                      onClick={() => setViewingOwner(owner)}
+                    >
+                      <ViewIcon />
                     </button>
-                    <button type="button" className="link danger" onClick={() => handleDelete(owner)}>
-                      Delete
+                    <button
+                      type="button"
+                      className="icon-btn"
+                      aria-label={`Edit ${owner.name}`}
+                      title="Edit"
+                      onClick={() => openEditForm(owner)}
+                    >
+                      <EditIcon />
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-btn danger"
+                      aria-label={`Delete ${owner.name}`}
+                      title="Delete"
+                      onClick={() => handleDelete(owner)}
+                    >
+                      <DeleteIcon />
                     </button>
                   </td>
                 </tr>

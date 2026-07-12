@@ -215,14 +215,16 @@ function CarOwnersPage() {
           <table className="data-table">
             <thead>
               <tr>
+                <th>SL</th>
                 <th>Name</th>
                 <th>Phone number</th>
                 <th>Action</th>
               </tr>
             </thead>
             <tbody>
-              {owners.map((owner) => (
+              {owners.map((owner, index) => (
                 <tr key={owner.id}>
+                  <td>{index + 1}</td>
                   <td>{owner.name}</td>
                   <td>{owner.phone_number}</td>
                   <td className="data-table-actions">

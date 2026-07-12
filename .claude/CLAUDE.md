@@ -181,12 +181,19 @@ remaining features.
 - List pages render records in a full-width `<table className="data-table">`
   wrapped in `<div className="data-table-wrap card">` — both classes are
   shared in `App.css`, not per-feature CSS. `.data-table` rows get a
-  background-tint hover transition for free; the last column is always a
-  plain `<th>Action</th>` header containing three `.icon-btn`s per row
-  (`ViewIcon`/`EditIcon`/`DeleteIcon` from `NavIcons.tsx`, delete using
-  `className="icon-btn danger"` for the `--status-critical` hover tint) —
-  copy this exact pattern (see `CarOwnersPage.tsx`) rather than inventing
-  row actions or a text-link style per feature.
+  background-tint hover transition for free; headers are bold
+  (`.data-table th`, `font-weight: 700`). The **first column is always
+  `SL`** (1-based row index via `.map((row, index) => ...)`, not the
+  record's id/uuid). The **last column is always `Action`**
+  (right-aligned via `.data-table th:last-child`) containing three
+  `.icon-btn`s per row (`ViewIcon`/`EditIcon`/`DeleteIcon` from
+  `NavIcons.tsx`; delete uses `className="icon-btn danger"` for the
+  `--status-critical` hover tint). `.icon-btn` has a `1px solid
+  var(--border)` border, matching `.app-nav-icon` in `NavMenu.css` — icon
+  buttons everywhere in this app get that bordered-square look, not bare
+  icons. Copy this exact pattern (see `CarOwnersPage.tsx`) rather than
+  inventing row actions, a text-link style, or a different column order
+  per feature.
 - Create/edit/view forms are **real modals**, not inline cards, using the
   shared `App.css` classes `.modal-backdrop` (fixed inset, centered,
   semi-transparent, `onClick` closes) wrapping a `.modal-panel.card` panel

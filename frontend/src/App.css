@@ -87,11 +87,15 @@
 }
 
 .data-table th {
-  color: var(--text);
-  font-weight: 500;
+  color: var(--text-h);
+  font-weight: 700;
   font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+.data-table th:last-child {
+  text-align: right;
 }
 
 .data-table tr:last-child td {
@@ -119,14 +123,15 @@
   width: 32px;
   height: 32px;
   padding: 0;
-  border: none;
+  border: 1px solid var(--border);
   border-radius: 6px;
   background: transparent;
   color: var(--text);
   cursor: pointer;
   transition:
     background-color 0.15s ease,
-    color 0.15s ease;
+    color 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .icon-btn svg {
@@ -137,11 +142,13 @@
 .icon-btn:hover {
   background: var(--accent-bg);
   color: var(--accent);
+  border-color: var(--accent-border);
 }
 
 .icon-btn.danger:hover {
   background: rgba(208, 59, 59, 0.1);
   color: var(--status-critical);
+  border-color: var(--status-critical);
 }
 
 /* Shared modal style: create/edit/view dialogs on every feature page. */

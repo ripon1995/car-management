@@ -22,14 +22,22 @@ A Driver is the person who operates a Car day-to-day.
   Not added by default — add if confirmed.
 
 ## API Endpoints
-- `GET /api/v1/drivers` — list, filter by `name`; paginated.
+All endpoints require authentication (see [Auth](09-auth.md)); any
+logged-in user can manage any driver.
+- `GET /api/v1/drivers` — list (not yet implemented: pagination/filtering
+  by `name` — currently returns all rows, matching
+  [Car Owner](04-car-owner.md)'s current state).
 - `POST /api/v1/drivers`
-- `GET /api/v1/drivers/{id}` — consider including currently assigned car(s).
+- `GET /api/v1/drivers/{id}` — retrieve; does **not** include currently
+  assigned car(s) (no expanded/joined reads implemented for any feature
+  yet).
 - `PUT /api/v1/drivers/{id}`
 - `DELETE /api/v1/drivers/{id}`
 
 ## Business Rules & Validation
-- `contact_number` / `whatsapp_number` basic phone format validation.
-- Deleting a Driver currently assigned to a Car: restrict deletion (or
-  require unassigning first) rather than silently nulling
-  `cars.driver_id`. **(assumption — confirm desired behavior.)**
+- `contact_number` / `whatsapp_number` format validation: **not
+  implemented** — accepted as free-form strings for now.
+- Deleting a Driver currently assigned to a Car is restricted:
+  `DriverService.delete` queries `cars` for any row with a matching
+  `driver_id` and raises `ConflictException` instead of deleting, rather
+  than relying on the FK constraint to reject it.

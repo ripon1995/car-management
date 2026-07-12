@@ -15,6 +15,9 @@ from app.db.base import Base
 # features here as they're built.
 from app.features.auth import models as _auth_models  # noqa: F401
 from app.features.car_owners import models as _car_owners_models  # noqa: F401
+from app.features.vendors import models as _vendors_models  # noqa: F401
+from app.features.drivers import models as _drivers_models  # noqa: F401
+from app.features.cars import models as _cars_models  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

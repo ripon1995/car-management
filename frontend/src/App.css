@@ -188,7 +188,9 @@
   margin: 0 0 4px;
 }
 
-.modal-panel input {
+.modal-panel input,
+.modal-panel select,
+.modal-panel textarea {
   font: inherit;
   padding: 12px 14px;
   border: 1px solid var(--border);
@@ -197,11 +199,19 @@
   color: var(--text-h);
 }
 
-.modal-panel input::placeholder {
+.modal-panel textarea {
+  resize: vertical;
+  min-height: 72px;
+}
+
+.modal-panel input::placeholder,
+.modal-panel textarea::placeholder {
   color: var(--text);
 }
 
-.modal-panel input:focus {
+.modal-panel input:focus,
+.modal-panel select:focus,
+.modal-panel textarea:focus {
   outline: 2px solid var(--accent-border);
   outline-offset: 1px;
 }

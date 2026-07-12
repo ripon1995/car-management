@@ -24,16 +24,22 @@ per car.
   correct for your business.
 
 ## API Endpoints
-- `GET /api/v1/vendors` — list, filter by `name`; paginated.
+All endpoints require authentication (see [Auth](09-auth.md)); any
+logged-in user can manage any vendor.
+- `GET /api/v1/vendors` — list (not yet implemented: pagination/filtering
+  by `name` — currently returns all rows, matching
+  [Car Owner](04-car-owner.md)'s current state).
 - `POST /api/v1/vendors`
-- `GET /api/v1/vendors/{id}` — consider including currently assigned cars.
+- `GET /api/v1/vendors/{id}` — retrieve; does **not** include currently
+  assigned cars (no expanded/joined reads implemented for any feature yet).
 - `PUT /api/v1/vendors/{id}`
 - `DELETE /api/v1/vendors/{id}`
 
 ## Business Rules & Validation
-- `contact_number` / `whatsapp_number` should be validated for basic phone
-  format (country-code aware if operating in one region, e.g. `+880...`).
-- `monthly_fare` must be >= 0.
-- Deleting a Vendor currently assigned to one or more Cars: restrict deletion
-  (or require unassigning cars first) rather than silently nulling
-  `cars.vendor_id`. **(assumption — confirm desired behavior.)**
+- `contact_number` / `whatsapp_number` format validation: **not
+  implemented** — accepted as free-form strings for now.
+- `monthly_fare` must be >= 0 (`ValidationException` otherwise).
+- Deleting a Vendor currently assigned to one or more Cars is restricted:
+  `VendorService.delete` queries `cars` for any row with a matching
+  `vendor_id` and raises `ConflictException` instead of deleting, rather
+  than relying on the FK constraint to reject it.

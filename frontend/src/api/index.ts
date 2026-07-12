@@ -1,3 +1,6 @@
 export * from './auth'
 export * from './client'
 export * from './carOwners'
+export * from './vendors'
+export * from './drivers'
+export * from './cars'

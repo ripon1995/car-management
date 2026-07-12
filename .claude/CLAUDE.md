@@ -4,12 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project state
 
-Backend is scaffolded (FastAPI app, Car Owner CRUD + separate Auth/User
-JWT login). Frontend is scaffolded too (Vite + React + TypeScript, routing,
-auth pages, nav shell) with Car Owner CRUD as the first fully-built feature
-page — see "Frontend architecture" below for the conventions it set that
-the remaining feature pages (Car, Vendor, Driver, Maintenance, Car Docs,
-Payment, Revenue dashboard) should follow.
+Backend is scaffolded (FastAPI app, separate Auth/User JWT login) with
+Car Owner, Vendor, Driver, and Car CRUD fully built. Frontend is scaffolded
+too (Vite + React + TypeScript, routing, auth pages, nav shell) with Car
+Owner CRUD as the first fully-built feature page, followed by Vendor,
+Driver, and Car pages built the same way — see "Frontend architecture"
+below for the conventions they set that the remaining feature pages
+(Maintenance, Car Docs, Payment, Revenue dashboard) should follow.
 
 **No unit tests in this project by explicit user instruction** — don't add
 a test suite unless asked.
@@ -25,7 +26,9 @@ Run from `backend/`, with the venv active
 - Create a migration: `alembic revision -m "message"` (written by hand — no
   live Supabase DB to autogenerate against in this environment; add
   `op.create_table`/etc. manually, following `alembic/versions/0001_create_car_owners.py`
-  as a template)
+  as a template — `0005_create_cars.py` is the template for a table with FKs
+  to other feature tables, including the `unique=True` index pattern for
+  `engine_number`/`chassis_number`)
 
 Dependencies are declared in `backend/pyproject.toml` (`pip install -e ".[dev]"`).
 
@@ -71,8 +74,8 @@ cross-cutting infrastructure lives outside `app/features/`.
 - `app/db/` — async SQLAlchemy engine/session (`asyncpg` driver) and the
   shared declarative `Base`.
 - Each feature package follows a **repository → service → router**
-  layering — this is the template to copy for the remaining features (Car,
-  Vendor, Driver, Maintenance, Car Docs, Payment):
+  layering — this is the template to copy for the remaining features
+  (Maintenance, Car Docs, Payment):
   - `models.py` — SQLAlchemy model(s).
   - `schemas.py` — Pydantic request/response models.
   - `repository.py` — a `<Feature>Repository` class wrapping the
@@ -112,6 +115,31 @@ cross-cutting infrastructure lives outside `app/features/`.
     any logged-in user has full CRUD power, there's no per-owner scoping.
     Protect new feature routers the same way unless a feature doc says
     otherwise.
+- `app/features/vendors/` and `app/features/drivers/` — plain CRUD, same
+  shape as `car_owners`. Both add one cross-feature check in their
+  `service.py`: `delete()` queries `app.features.cars.models.Car` for any
+  row whose `vendor_id`/`driver_id` points at the record being deleted and
+  raises `ConflictException` instead of deleting (rather than relying on
+  the raw FK `IntegrityError` from Postgres) — copy this pattern for any
+  other feature whose deletion must be restricted while referenced
+  elsewhere. `VendorService` additionally validates `monthly_fare >= 0`
+  (`ValidationException`).
+- `app/features/cars/` — the hub entity, with FKs to `car_owners`
+  (`owner_id`, required), `vendors` (`vendor_id`, optional), and `drivers`
+  (`driver_id`, optional). `CarService` takes all three repositories as
+  constructor args (see `get_car_service`) and validates: `model_year` is
+  in `[1980, current_year + 1]`; `engine_number`/`chassis_number` are
+  unique (`ConflictException`, checked via
+  `CarRepository.get_by_engine_number`/`get_by_chassis_number`); and that
+  `owner_id`/`vendor_id`/`driver_id` reference rows that actually exist
+  (`NotFoundException`) — reuse this
+  validate-references-via-sibling-repository approach for any future
+  feature that takes a foreign key as user input. There is a single `PUT`
+  endpoint (not a separate reassignment `PATCH`) since `CarUpdate` already
+  makes every field optional and applies via `exclude_unset`, so a caller
+  can `PUT` just `{"vendor_id": ...}` — same convention as `car_owners`.
+  No pagination/filtering on `GET /cars` yet, matching `car_owners`'
+  current (also not-yet-implemented) state.
 - `app/api.py` — thin aggregator that `include_router`s each feature's
   router(s); mounted under `/api/v1` in `app/main.py` (the version prefix
   is deliberate — keep it, don't flatten to bare `/api`). **When adding a
@@ -125,9 +153,11 @@ cross-cutting infrastructure lives outside `app/features/`.
   `settings.allow_origins`) → `RequestLoggerMiddleware` →
   `include_router(api_router, prefix=settings.api_v1_prefix)`.
 - `alembic/env.py` imports each feature's `models` module explicitly (e.g.
-  `app.features.auth.models`, `app.features.car_owners.models`) so its
-  tables register on `Base.metadata` before migrations run — add the new
-  import there too when adding a feature.
+  `app.features.auth.models`, `app.features.car_owners.models`,
+  `app.features.vendors.models`, `app.features.drivers.models`,
+  `app.features.cars.models`) so its tables register on `Base.metadata`
+  before migrations run — add the new import there too when adding a
+  feature.
 
 **Known environment quirk:** this venv is Python 3.14 (very new). Standard
 `passlib[bcrypt]` fails at runtime here (`AttributeError: module 'bcrypt'
@@ -146,8 +176,10 @@ The frontend is **feature-first** too, mirroring the backend split — each
 business entity gets a page, an API module, and (if it needs more than
 primitive fields) a types file. `app/features/car_owners/` on the backend
 maps to `src/pages/CarOwnersPage.tsx` + `src/api/carOwners.ts` +
-`src/types/carOwner.ts` on the frontend; follow that layout for the
-remaining features.
+`src/types/carOwner.ts` on the frontend; `vendors`/`drivers`/`cars` follow
+the same layout (`VendorsPage.tsx`/`DriversPage.tsx`/`CarsPage.tsx` +
+matching `api/`/`types/` modules). Follow this layout for the remaining
+features (Maintenance, Car Docs, Payment, Revenue dashboard) too.
 
 - `src/api/client.ts` — `request<T>(path, options)` (fetch wrapper: base
   URL, JSON headers, error → `ApiError` mapping, 401 →
@@ -213,6 +245,16 @@ remaining features.
   `ViewIcon`) reuses the same `.modal-backdrop`/`.modal-panel.card` shell
   with a `<dl className="detail-list">` (shared in `App.css`) instead of
   form inputs — see `CarOwnersPage.tsx`'s `viewingOwner` modal.
+- `.modal-panel` also styles bare `select`/`textarea` elements the same as
+  `input` (added for Vendor/Driver's `address` textarea and Car's
+  owner/vendor/driver `select`s) — reuse these rather than styling a
+  one-off. For a feature whose form needs to pick another feature's record
+  (like Car picking a Car Owner/Vendor/Driver), fetch that sibling
+  feature's list in the same page-load `Promise.all` as the page's own
+  list (see `CarsPage.tsx`), use it to populate the `<select>` options in
+  the form, and reuse it again to resolve id → name for display in the
+  table and view modal (there's no expanded/joined read from the API —
+  `CarRead` only carries the raw FK ids).
 - `NavIcons.tsx` holds every icon as a small inline-SVG component built
   from the shared `iconProps()` helper (24×24 viewBox, `stroke="currentColor"`,
   `strokeWidth="1.5"`) — add new icons here (e.g. `PlusIcon`) rather than

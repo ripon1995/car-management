@@ -33,21 +33,30 @@ owner, its currently assigned vendor, and its currently assigned driver.
   would be needed — not built here; flag if this matters.
 
 ## API Endpoints
-- `GET /api/v1/cars` — list, filter by `owner_id`, `vendor_id`, `driver_id`,
-  `brand`; paginated.
-- `POST /api/v1/cars` — create.
-- `GET /api/v1/cars/{id}` — retrieve, ideally with expanded owner/vendor/driver
-  summaries.
-- `PUT /api/v1/cars/{id}` — full update.
-- `PATCH /api/v1/cars/{id}` — partial update (e.g. reassign vendor/driver only).
-- `DELETE /api/v1/cars/{id}` — delete.
+All endpoints require authentication (see [Auth](09-auth.md)); any
+logged-in user can manage any car.
+- `GET /api/v1/cars` — list (not yet implemented: pagination/filtering by
+  `owner_id`/`vendor_id`/`driver_id`/`brand` — currently returns all rows,
+  matching [Car Owner](04-car-owner.md)'s current state).
+- `POST /api/v1/cars`
+- `GET /api/v1/cars/{id}` — retrieve; returns the raw FK ids only, no
+  expanded owner/vendor/driver summaries (the frontend resolves id → name
+  itself by fetching those lists separately, see `CarsPage.tsx`).
+- `PUT /api/v1/cars/{id}` — every field is optional and applied via
+  `exclude_unset`, so this doubles as the reassignment action (e.g.
+  `PUT {"vendor_id": ...}`) — **implemented as a single `PUT`, no separate
+  `PATCH`**, consistent with `car_owners`.
+- `DELETE /api/v1/cars/{id}`
 
 ## Business Rules & Validation
-- `engine_number` and `chassis_number` must be unique across all cars.
-- `model_year` should be a sane integer range (e.g. 1980–current year + 1).
-- Reassigning `vendor_id` or `driver_id` should be a first-class action
-  (e.g. `PATCH`) rather than requiring a full `PUT`, since this is likely a
-  frequent operation.
-- Deleting a Car referenced by Maintenance/CarDocs/Payment records: decide
-  on cascade vs. restrict. **(assumption: restrict — require those child
-  records to be handled first, or soft-delete the car instead.)**
+- `engine_number` and `chassis_number` must be unique across all cars
+  (`ConflictException` on violation).
+- `model_year` must be in `[1980, current year + 1]` (`ValidationException`
+  otherwise).
+- `owner_id` (and `vendor_id`/`driver_id` when provided) must reference an
+  existing row, checked against the respective feature's repository
+  (`NotFoundException` otherwise) — `CarService` takes the Car Owner,
+  Vendor, and Driver repositories as constructor dependencies for this.
+- Deleting a Car referenced by Maintenance/CarDocs/Payment records: not yet
+  relevant since none of those tables exist yet — revisit (restrict vs.
+  cascade) when they're built.

@@ -1,35 +1,43 @@
 import uuid
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
-from sqlalchemy.ext.asyncio import AsyncSession
+from jose import JWTError
 
 from app.core.config import settings
-from app.db.session import get_db
+from app.core.exceptions import AuthenticationException
+from app.core.security import decode_access_token
 from app.features.auth.models import User
+from app.features.auth.service import AuthService, get_auth_service
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.api_v1_prefix}/auth/login")
+
+class OAuth2Bearer(OAuth2PasswordBearer):
+    """OAuth2PasswordBearer raises a bare HTTPException (missing/malformed
+    Authorization header) that bypasses our AppException handler and its
+    response shape. Re-raise as AuthenticationException so every auth
+    failure looks the same.
+    """
+
+    async def __call__(self, request: Request) -> str:
+        try:
+            return await super().__call__(request)
+        except HTTPException as exc:
+            raise AuthenticationException(exc.detail) from exc
+
+
+oauth2_scheme = OAuth2Bearer(tokenUrl=f"{settings.api_v1_prefix}/auth/login")
 
 
 async def get_current_user(
     token: str = Depends(oauth2_scheme),
-    db: AsyncSession = Depends(get_db),
+    service: AuthService = Depends(get_auth_service),
 ) -> User:
-    credentials_error = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
     try:
-        payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
-        user_id = payload.get("sub")
-        if user_id is None:
-            raise credentials_error
+        user_id = decode_access_token(token)
     except JWTError as exc:
-        raise credentials_error from exc
+        raise AuthenticationException() from exc
 
-    user = await db.get(User, uuid.UUID(user_id))
+    user = await service.get_by_id(uuid.UUID(user_id))
     if user is None:
-        raise credentials_error
+        raise AuthenticationException()
     return user

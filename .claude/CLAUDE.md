@@ -41,41 +41,79 @@ domain from `.claude/.rules/features/` gets its own package under
 cross-cutting infrastructure lives outside `app/features/`.
 
 - `app/core/config.py` — `pydantic-settings` reading `DATABASE_URL`,
-  `JWT_SECRET_KEY`, `JWT_ALGORITHM`, `ACCESS_TOKEN_EXPIRE_MINUTES` from
-  `.env`.
+  `ENVIRONMENT`, `ALLOW_ORIGINS`, `JWT_SECRET_KEY`, `JWT_ALGORITHM`,
+  `ACCESS_TOKEN_EXPIRE_MINUTES` from `.env`.
 - `app/core/security.py` — generic, feature-agnostic crypto helpers:
   password hashing/verification (`bcrypt` directly — **not** `passlib`,
   which is unmaintained and broken with `bcrypt>=4.1`, see below) and JWT
-  creation (`python-jose`).
+  creation/decoding (`python-jose`).
+- `app/core/exceptions.py` — `AppException` base class (`error_code`,
+  `error_status`, `message` as class defaults; `detail` is the per-raise
+  context) plus subclasses `AuthenticationException`,
+  `AuthorizationException`, `NotFoundException`, `ConflictException`,
+  `ValidationException`. Raise these from service layers instead of raw
+  `HTTPException` so every error response has the same JSON shape.
+- `app/core/exception_handler.py` — `register_exception_handlers(app)`,
+  called once from `main.py`; turns any `AppException` into a JSON response
+  (`error_code`/`error_status`/`detail`/`message`).
+- `app/core/logging.py` — `setup_logging()` (stdlib logging config) and
+  `RequestLoggerMiddleware` (logs method/path/status/duration per request).
 - `app/db/` — async SQLAlchemy engine/session (`asyncpg` driver) and the
   shared declarative `Base`.
+- Each feature package follows a **repository → service → router**
+  layering — this is the template to copy for the remaining features (Car,
+  Vendor, Driver, Maintenance, Car Docs, Payment):
+  - `models.py` — SQLAlchemy model(s).
+  - `schemas.py` — Pydantic request/response models.
+  - `repository.py` — a `<Feature>Repository` class wrapping the
+    `AsyncSession`: pure data access (`get_by_id`, `list_all`,
+    `create`/`update`/`delete`), no business rules.
+  - `service.py` — a `<Feature>Service` class taking the repository in its
+    constructor: business rules (uniqueness checks, 404s via
+    `NotFoundException`, etc.), plus a `get_<feature>_service(db =
+    Depends(get_db))` FastAPI dependency provider that wires the repository
+    and service together.
+  - `router.py` — HTTP layer only: depends on the service provider, no
+    direct DB/session access.
 - `app/features/auth/` — the generic login identity, decoupled from every
   business entity:
   - `models.py` — `User` (`users` table: `id`, `email`, `password_hash`,
     timestamps). No relationship to any business table.
   - `schemas.py` — `UserCreate`, `UserRead`, `Token`, `TokenPayload`.
-  - `dependencies.py` — `get_current_user`: decodes the Bearer JWT
-    (`sub` = user id) and loads the row. Any endpoint needing auth depends
+  - `repository.py` / `service.py` — `UserRepository` / `AuthService`
+    (`register`, `authenticate`, `get_by_id`); raises `ConflictException`
+    on duplicate email, `AuthenticationException` on bad credentials.
+  - `dependencies.py` — `OAuth2Bearer` (an `OAuth2PasswordBearer` subclass
+    that re-raises its bare `HTTPException` as `AuthenticationException`,
+    so missing/malformed tokens get the same error shape as everything
+    else) and `get_current_user`: decodes the Bearer JWT (`sub` = user id)
+    and loads the row via `AuthService`. Any endpoint needing auth depends
     on this.
   - `router.py` — `register`/`login`/`me`, mounted at `/auth`.
 - `app/features/car_owners/` — plain CRUD, no auth concept of its own:
   - `models.py` — `CarOwner` (`name`, `phone_number`, timestamps only —
     **no** email/password; car owners never log in).
   - `schemas.py` — `CarOwnerCreate`, `CarOwnerUpdate`, `CarOwnerRead`.
+  - `repository.py` / `service.py` — `CarOwnerRepository` /
+    `CarOwnerService`; `get_by_id` raises `NotFoundException` when missing.
   - `router.py` — standard list/create/get/update/delete, mounted at
     `/car-owners`. The whole router carries
     `dependencies=[Depends(get_current_user)]` from the `auth` feature —
     any logged-in user has full CRUD power, there's no per-owner scoping.
-    This is the template to copy for the remaining features (Car, Vendor,
-    Driver, Maintenance, Car Docs, Payment): protect the router the same
-    way unless a feature doc says otherwise.
+    Protect new feature routers the same way unless a feature doc says
+    otherwise.
 - `app/api.py` — thin aggregator that `include_router`s each feature's
-  router(s); mounted under `/api/v1` in `app/main.py`. **When adding a new
-  feature, create `app/features/<feature>/` following the `car_owners`
-  layout and register its router here.**
+  router(s); mounted under `/api/v1` in `app/main.py` (the version prefix
+  is deliberate — keep it, don't flatten to bare `/api`). **When adding a
+  new feature, create `app/features/<feature>/` following the
+  repository/service/router layout above and register its router here.**
 - Auth: `/api/v1/auth/{register,login,me}` (public except `/me`); login
   uses the standard OAuth2 password flow (`OAuth2PasswordRequestForm`:
   `username` = email) so Swagger's "Authorize" button works out of the box.
+- `app/main.py` wiring order: `setup_logging()` →
+  `register_exception_handlers(app)` → `CORSMiddleware` (origins from
+  `settings.allow_origins`) → `RequestLoggerMiddleware` →
+  `include_router(api_router, prefix=settings.api_v1_prefix)`.
 - `alembic/env.py` imports each feature's `models` module explicitly (e.g.
   `app.features.auth.models`, `app.features.car_owners.models`) so its
   tables register on `Base.metadata` before migrations run — add the new

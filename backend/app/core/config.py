@@ -5,6 +5,10 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/car_management"
+    environment: str = "development"
+    # Dev-only default: frontend/ isn't scaffolded yet, but React tooling
+    # (Vite) defaults to this port.
+    allow_origins: list[str] = ["http://localhost:5173"]
 
     jwt_secret_key: str = "change-me"
     jwt_algorithm: str = "HS256"

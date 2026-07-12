@@ -133,6 +133,14 @@ export function ProfileIcon() {
   )
 }
 
+export function PlusIcon() {
+  return (
+    <svg {...iconProps()}>
+      <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 export function LogoutIcon() {
   return (
     <svg {...iconProps()}>

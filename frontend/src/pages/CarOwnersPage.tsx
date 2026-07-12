@@ -1,5 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react'
-import { CarOwnersIcon } from '../components/NavIcons'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { CarOwnersIcon, PlusIcon } from '../components/NavIcons'
 import ErrorDialog from '../components/ErrorDialog'
 import { ApiError } from '../errors/api'
 import * as api from '../api'
@@ -20,6 +20,7 @@ function CarOwnersPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<CarOwnerInput>(emptyForm)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const nameInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -57,6 +58,17 @@ function CarOwnersPage() {
     setEditingId(null)
     setForm(emptyForm)
   }
+
+  useEffect(() => {
+    if (!isFormOpen) return
+    nameInputRef.current?.focus()
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') closeForm()
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [isFormOpen])
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
@@ -97,40 +109,49 @@ function CarOwnersPage() {
           Car Owners
         </h1>
         <button type="button" className="btn-primary" onClick={openCreateForm}>
-          Add car owner
+          <PlusIcon />
+          Add owner
         </button>
       </div>
 
       {isFormOpen && (
-        <form className="car-owner-form card" onSubmit={handleSubmit}>
-          <h2>{editingId ? 'Edit car owner' : 'New car owner'}</h2>
-          <label>
-            Name
+        <div className="car-owner-modal-backdrop" onClick={closeForm}>
+          <form
+            className="car-owner-form"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="car-owner-form-title"
+            onClick={(event) => event.stopPropagation()}
+            onSubmit={handleSubmit}
+          >
+            <h2 id="car-owner-form-title">{editingId ? 'Edit car owner' : 'New car owner'}</h2>
             <input
+              ref={nameInputRef}
               type="text"
+              placeholder="Name"
+              aria-label="Name"
               value={form.name}
               onChange={(event) => setForm((f) => ({ ...f, name: event.target.value }))}
               required
             />
-          </label>
-          <label>
-            Phone number
             <input
               type="tel"
+              placeholder="Phone number"
+              aria-label="Phone number"
               value={form.phone_number}
               onChange={(event) => setForm((f) => ({ ...f, phone_number: event.target.value }))}
               required
             />
-          </label>
-          <div className="car-owner-form-actions">
-            <button type="button" className="secondary" onClick={closeForm} disabled={isSubmitting}>
-              Cancel
-            </button>
-            <button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving…' : 'Save'}
-            </button>
-          </div>
-        </form>
+            <div className="car-owner-form-actions">
+              <button type="button" className="secondary" onClick={closeForm} disabled={isSubmitting}>
+                Cancel
+              </button>
+              <button type="submit" className="btn-primary" disabled={isSubmitting}>
+                {isSubmitting ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </form>
+        </div>
       )}
 
       {isLoading ? (

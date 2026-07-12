@@ -37,6 +37,9 @@
 }
 
 .btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font: inherit;
   padding: 10px 16px;
   border: none;
@@ -45,6 +48,11 @@
   color: #fff;
   cursor: pointer;
   white-space: nowrap;
+}
+
+.btn-primary svg {
+  width: 16px;
+  height: 16px;
 }
 
 .btn-primary:disabled {

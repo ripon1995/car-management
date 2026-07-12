@@ -11,35 +11,46 @@
   box-shadow: var(--shadow);
 }
 
+.car-owner-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(16, 24, 40, 0.45);
+  padding: 16px;
+  z-index: 100;
+}
+
 .car-owner-form {
   display: flex;
   flex-direction: column;
   gap: 16px;
   width: 100%;
-  max-width: 420px;
-  padding: 24px;
+  max-width: 560px;
+  padding: 32px;
   box-sizing: border-box;
+  background: var(--surface);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  text-align: left;
 }
 
 .car-owner-form h2 {
-  margin: 0;
-}
-
-.car-owner-form label {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 15px;
-  color: var(--text-h);
+  margin: 0 0 4px;
 }
 
 .car-owner-form input {
   font: inherit;
-  padding: 10px 12px;
+  padding: 12px 14px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--surface);
   color: var(--text-h);
+}
+
+.car-owner-form input::placeholder {
+  color: var(--text);
 }
 
 .car-owner-form input:focus {
@@ -49,8 +60,9 @@
 
 .car-owner-form-actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 10px;
+  margin-top: 8px;
 }
 
 .car-owner-form-actions button {
@@ -59,11 +71,6 @@
   border: none;
   border-radius: 6px;
   cursor: pointer;
-}
-
-.car-owner-form-actions button[type='submit'] {
-  background: var(--accent);
-  color: #fff;
 }
 
 .car-owner-form-actions button.secondary {

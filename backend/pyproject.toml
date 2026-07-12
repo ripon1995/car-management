@@ -1,0 +1,25 @@
+[project]
+name = "car-management-backend"
+version = "0.1.0"
+description = "Car management API (FastAPI + Supabase Postgres)"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi>=0.139.0",
+    "uvicorn[standard]>=0.51.0",
+    "sqlalchemy[asyncio]>=2.0.51",
+    "asyncpg>=0.31.0",
+    "alembic>=1.18.5",
+    "pydantic-settings>=2.14.2",
+    "python-jose[cryptography]>=3.5.0",
+    "bcrypt>=5.0.0",
+    "python-multipart>=0.0.32",
+    "email-validator>=2.3.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.15.21",
+]
+
+[tool.ruff]
+line-length = 100

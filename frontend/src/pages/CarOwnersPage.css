@@ -4,13 +4,6 @@
   width: 100%;
 }
 
-.card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: var(--shadow);
-}
-
 .car-owner-modal-backdrop {
   position: fixed;
   inset: 0;

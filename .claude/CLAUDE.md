@@ -5,8 +5,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project state
 
 Backend is scaffolded (FastAPI app, Car Owner CRUD + separate Auth/User
-JWT login). Frontend is still pre-code: only `frontend/.node-version`
-(24.18.0) exists so far.
+JWT login). Frontend is scaffolded too (Vite + React + TypeScript, routing,
+auth pages, nav shell) with Car Owner CRUD as the first fully-built feature
+page — see "Frontend architecture" below for the conventions it set that
+the remaining feature pages (Car, Vendor, Driver, Maintenance, Car Docs,
+Payment, Revenue dashboard) should follow.
 
 **No unit tests in this project by explicit user instruction** — don't add
 a test suite unless asked.
@@ -132,6 +135,76 @@ has no attribute '__about__'`) because passlib is unmaintained and doesn't
 support modern `bcrypt`. Use the `bcrypt` package's `hashpw`/`checkpw`
 directly instead, as `app/core/security.py` already does — don't
 reintroduce `passlib`.
+
+## Frontend architecture
+
+Run from `frontend/`: `npm run dev` (Vite dev server), `npm run build`
+(`tsc -b && vite build`), `npm run lint` (`oxlint`). `VITE_API_URL`
+(`.env`, default `http://localhost:8000/api/v1`) points at the backend.
+
+The frontend is **feature-first** too, mirroring the backend split — each
+business entity gets a page, an API module, and (if it needs more than
+primitive fields) a types file. `app/features/car_owners/` on the backend
+maps to `src/pages/CarOwnersPage.tsx` + `src/api/carOwners.ts` +
+`src/types/carOwner.ts` on the frontend; follow that layout for the
+remaining features.
+
+- `src/api/client.ts` — `request<T>(path, options)` (fetch wrapper: base
+  URL, JSON headers, error → `ApiError` mapping, 401 →
+  `unauthorizedHandler`) and `authHeaders()` (reads the stored JWT into an
+  `Authorization` header). Feature API modules (`src/api/<feature>.ts`)
+  call `request()` and pass `headers: authHeaders()` on every authenticated
+  endpoint; barrel-exported through `src/api/index.ts`
+  (`export * from './<feature>'`) so pages/store just `import * as api
+  from '../api'`.
+- `src/errors/api.ts` — `ApiError` (`status`/`message`/`detail`/
+  `errorCode`); `src/components/ErrorDialog.tsx` renders one as a modal.
+  Catch blocks normalize unknown errors with a local
+  `toApiError(err)` helper (`err instanceof ApiError ? err : new
+  ApiError(0, 'Something went wrong', 'Something went wrong')`) before
+  `setError` — copy this helper into each new page rather than importing
+  it, matching the existing `LoginPage`/`RegisterPage`/`CarOwnersPage`
+  duplication.
+- Shared page-chrome classes live in `App.css` (global, not per-page) since
+  every feature page reuses them — add new cross-page primitives there,
+  not in a page's own CSS file:
+  - `.page-header` — flex row, `justify-content: space-between`, wraps the
+    `<h1 className="page-title">` (icon from `NavIcons.tsx` + title) and
+    the primary action button. This is what pins the action button to the
+    **top right** of the page — always wrap a feature page's title + main
+    action in `.page-header`, don't build a one-off header layout.
+  - `.btn-primary` — the accent-colored action button (icon + short label,
+    e.g. `<PlusIcon /> Add owner` — icon first, label short not
+    `"Add car owner"`). Reuse for every page's main create action.
+  - `.card` — generic surface (`var(--surface)` bg, border, shadow,
+    rounded corners) for panels/tables/detail views.
+- List pages render records in a `.card`-wrapped `<table>` (see
+  `CarOwnersPage.css` `.car-owners-table*` rules) with per-row `Edit`/
+  `Delete` as plain `button.link` (accent) / `button.link.danger`
+  (`--status-critical`) — copy this pattern rather than inventing row
+  actions per feature.
+- Create/edit forms are **real modals**, not inline cards: a
+  `.<feature>-modal-backdrop` (fixed inset, centered, semi-transparent,
+  `onClick` closes) wrapping a `.<feature>-form.card`-style panel
+  (`role="dialog"`, `aria-modal`, `aria-labelledby`,
+  `onClick={(e) => e.stopPropagation()}` so backdrop clicks don't bubble
+  into the form). Escape key and backdrop click both close it; the first
+  field autofocuses on open (see `CarOwnersPage.tsx`'s `nameInputRef` +
+  the `isFormOpen` effect). Inputs use `placeholder` text as the visible
+  hint instead of a `<label>`, with `aria-label` carrying the same text for
+  accessibility — no visible `<label>` elements in these modals (contrast
+  `AuthForm.css`'s login/register forms, which predate this convention and
+  do use visible labels; don't backport this modal style onto those two
+  pages without being asked). Footer actions split via
+  `justify-content: space-between`: **Cancel bottom-left**, primary
+  submit (`.btn-primary`) **bottom-right**.
+- `NavIcons.tsx` holds every icon as a small inline-SVG component built
+  from the shared `iconProps()` helper (24×24 viewBox, `stroke="currentColor"`,
+  `strokeWidth="1.5"`) — add new icons here (e.g. `PlusIcon`) rather than
+  inlining SVG in a page.
+- Auth/session state lives in `src/store/authStore.ts` (zustand), not
+  per-page state — feature pages only hold their own list/form/loading
+  state locally with `useState`, matching `CarOwnersPage.tsx`.
 
 ## What this project is
 

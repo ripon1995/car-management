@@ -72,10 +72,14 @@ async def run_async_migrations() -> None:
 
     """
 
+    # statement_cache_size=0: same Supabase pgbouncer requirement as
+    # app/db/session.py — this engine is built separately from that one, so
+    # it needs the connect_arg repeated here.
     connectable = async_engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args={"statement_cache_size": 0},
     )
 
     async with connectable.connect() as connection:

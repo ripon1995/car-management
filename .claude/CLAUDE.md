@@ -33,6 +33,13 @@ instead (`...pooler.supabase.com`, port `6543` transaction / `5432`
 session), and remember to add `+asyncpg` to the scheme yourself — Supabase's
 copy-paste string doesn't include it.
 
+**Known Supabase gotcha #2:** the pooler's `pgbouncer` runs in transaction
+mode, which doesn't support asyncpg's server-side prepared statement cache —
+without a fix, concurrent requests intermittently fail with
+`asyncpg.exceptions.DuplicatePreparedStatementError`. `app/db/session.py`
+passes `connect_args={"statement_cache_size": 0}` to `create_async_engine`
+to disable that cache; don't remove it.
+
 ## Backend architecture
 
 The backend is organized **feature-first**, not by technical layer: each

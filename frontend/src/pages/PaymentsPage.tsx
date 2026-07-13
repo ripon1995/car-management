@@ -297,19 +297,24 @@ function PaymentsPage() {
               type="number"
               min="0"
               step="0.01"
-              placeholder="Amount"
+              placeholder="Amount (e.g. 1500.00)"
               aria-label="Amount"
-              value={form.amount}
-              onChange={(event) => setForm((f) => ({ ...f, amount: Number(event.target.value) }))}
+              value={form.amount === 0 ? '' : form.amount}
+              onChange={(event) =>
+                setForm((f) => ({ ...f, amount: event.target.value === '' ? 0 : Number(event.target.value) }))
+              }
               required
             />
-            <input
-              type="date"
-              aria-label="Payment date"
-              value={form.payment_date}
-              onChange={(event) => setForm((f) => ({ ...f, payment_date: event.target.value }))}
-              required
-            />
+            <div className="field-with-hint">
+              <input
+                type="date"
+                aria-label="Payment date"
+                value={form.payment_date}
+                onChange={(event) => setForm((f) => ({ ...f, payment_date: event.target.value }))}
+                required
+              />
+              <span className="field-hint">Date the payment was made — format YYYY-MM-DD</span>
+            </div>
             <input
               ref={paidByInputRef}
               type="text"

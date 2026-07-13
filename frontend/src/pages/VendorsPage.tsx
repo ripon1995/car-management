@@ -188,11 +188,14 @@ function VendorsPage() {
               type="number"
               min="0"
               step="0.01"
-              placeholder="Monthly fare"
+              placeholder="Monthly fare (e.g. 1500.00)"
               aria-label="Monthly fare"
-              value={form.monthly_fare}
+              value={form.monthly_fare === 0 ? '' : form.monthly_fare}
               onChange={(event) =>
-                setForm((f) => ({ ...f, monthly_fare: Number(event.target.value) }))
+                setForm((f) => ({
+                  ...f,
+                  monthly_fare: event.target.value === '' ? 0 : Number(event.target.value),
+                }))
               }
               required
             />

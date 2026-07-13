@@ -4,10 +4,12 @@ import ErrorDialog from '../components/ErrorDialog'
 import { ApiError } from '../errors/api'
 import * as api from '../api'
 import type { Car } from '../types/car'
+import type { Payment } from '../types/payment'
 import type { RevenueSummary } from '../types/revenue'
 import './DashboardPage.css'
 
 const TYPE_ORDER = ['monthly_fair', 'service', 'document', 'other'] as const
+const INCOME_TYPE = 'monthly_fair'
 
 const typeLabels: Record<string, string> = {
   monthly_fair: 'Monthly fare',
@@ -38,6 +40,12 @@ function formatPeriod(period: string) {
   const date = new Date(`${period}-01T00:00:00`)
   if (Number.isNaN(date.getTime())) return period
   return date.toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
+}
+
+function formatDate(value: string) {
+  const date = new Date(`${value}T00:00:00`)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
 function DonutChart({ summary }: { summary: RevenueSummary }) {
@@ -197,8 +205,11 @@ function DashboardPage() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [summary, setSummary] = useState<RevenueSummary | null>(null)
+  const [payments, setPayments] = useState<Payment[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<ApiError | null>(null)
+
+  const filteredMode = Boolean(carId || dateFrom || dateTo)
 
   useEffect(() => {
     api.listCars().catch(() => undefined).then((data) => data && setCars(data))
@@ -223,10 +234,41 @@ function DashboardPage() {
     }
   }, [carId, dateFrom, dateTo])
 
+  useEffect(() => {
+    if (!filteredMode) {
+      setPayments([])
+      return
+    }
+    let cancelled = false
+    api
+      .listPayments({ carId: carId || undefined, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined })
+      .catch(() => undefined)
+      .then((data) => {
+        if (!cancelled && data) setPayments(data)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [carId, dateFrom, dateTo, filteredMode])
+
   const carLabel = useMemo(() => {
     const map = new Map(cars.map((car) => [car.id, car.registration_number ?? '—']))
     return (id: string) => map.get(id) ?? '—'
   }, [cars])
+
+  const sortedPayments = useMemo(
+    () => [...payments].sort((a, b) => a.payment_date.localeCompare(b.payment_date)),
+    [payments],
+  )
+
+  const paymentsNet = useMemo(
+    () =>
+      sortedPayments.reduce(
+        (sum, payment) => sum + (payment.type === INCOME_TYPE ? payment.amount : -payment.amount),
+        0,
+      ),
+    [sortedPayments],
+  )
 
   return (
     <main id="content" className="dashboard-page">
@@ -293,26 +335,44 @@ function DashboardPage() {
             </div>
           </div>
 
-          {carId ? (
+          {filteredMode ? (
             <div className="data-table-wrap card">
               <table className="data-table">
                 <thead>
                   <tr>
                     <th>SL</th>
+                    <th>Date</th>
                     <th>Car</th>
-                    <th>Income</th>
-                    <th>Expense</th>
-                    <th>Net</th>
+                    <th>Amount</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr key={carId}>
-                    <td>1</td>
-                    <td>{carLabel(carId)}</td>
-                    <td>{formatAmount(summary.total_income)}</td>
-                    <td>{formatAmount(summary.total_expense)}</td>
-                    <td className={summary.net_revenue >= 0 ? 'good' : 'critical'}>
-                      {formatAmount(summary.net_revenue)}
+                  {sortedPayments.length === 0 && (
+                    <tr>
+                      <td colSpan={4}>No payments in range</td>
+                    </tr>
+                  )}
+                  {sortedPayments.map((payment, index) => {
+                    const signed = payment.type === INCOME_TYPE ? payment.amount : -payment.amount
+                    return (
+                      <tr key={payment.id}>
+                        <td>{index + 1}</td>
+                        <td>{formatDate(payment.payment_date)}</td>
+                        <td>{carLabel(payment.car_id)}</td>
+                        <td className={signed >= 0 ? 'good' : 'critical'}>
+                          {signed >= 0 ? '+' : '-'}
+                          {formatAmount(Math.abs(signed))}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                  <tr className="net-row">
+                    <td colSpan={3} className="net-row-label">
+                      Net
+                    </td>
+                    <td className={paymentsNet >= 0 ? 'good' : 'critical'}>
+                      {paymentsNet >= 0 ? '+' : '-'}
+                      {formatAmount(Math.abs(paymentsNet))}
                     </td>
                   </tr>
                 </tbody>

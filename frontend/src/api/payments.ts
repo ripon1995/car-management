@@ -1,8 +1,21 @@
 import { request, authHeaders } from './client'
 import type { Payment, PaymentInput } from '../types/payment'
 
-export function listPayments(): Promise<Payment[]> {
-  return request<Payment[]>('/payments', { headers: authHeaders() })
+export interface PaymentFilters {
+  carId?: string
+  type?: string
+  dateFrom?: string
+  dateTo?: string
+}
+
+export function listPayments(filters: PaymentFilters = {}): Promise<Payment[]> {
+  const params = new URLSearchParams()
+  if (filters.carId) params.set('car_id', filters.carId)
+  if (filters.type) params.set('type', filters.type)
+  if (filters.dateFrom) params.set('date_from', filters.dateFrom)
+  if (filters.dateTo) params.set('date_to', filters.dateTo)
+  const query = params.toString()
+  return request<Payment[]>(`/payments${query ? `?${query}` : ''}`, { headers: authHeaders() })
 }
 
 export function createPayment(input: PaymentInput): Promise<Payment> {

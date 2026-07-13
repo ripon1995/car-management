@@ -16,11 +16,11 @@ const typeLabels: Record<string, string> = {
 }
 
 const emptyForm: MaintenanceInput = {
-  name: '',
   type: 'service',
   cost: 0,
   service_place: '',
   service_by: '',
+  description: '',
   car_id: '',
 }
 
@@ -38,7 +38,7 @@ function MaintenancePage() {
   const [form, setForm] = useState<MaintenanceInput>(emptyForm)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [viewingRecord, setViewingRecord] = useState<MaintenanceRecord | null>(null)
-  const nameInputRef = useRef<HTMLInputElement>(null)
+  const typeSelectRef = useRef<HTMLSelectElement>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -66,6 +66,10 @@ function MaintenancePage() {
     return `${car.brand} ${car.model_name ?? ''}`.trim()
   }
 
+  function recordLabel(record: MaintenanceRecord) {
+    return `${typeLabels[record.type]} — ${carLabel(record.car_id)}`
+  }
+
   function openCreateForm() {
     setEditingId(null)
     setForm(emptyForm)
@@ -76,11 +80,11 @@ function MaintenancePage() {
     setViewingRecord(null)
     setEditingId(record.id)
     setForm({
-      name: record.name,
       type: record.type,
       cost: record.cost,
       service_place: record.service_place,
       service_by: record.service_by,
+      description: record.description ?? '',
       car_id: record.car_id,
     })
     setIsFormOpen(true)
@@ -94,7 +98,7 @@ function MaintenancePage() {
 
   useEffect(() => {
     if (!isFormOpen) return
-    nameInputRef.current?.focus()
+    typeSelectRef.current?.focus()
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') closeForm()
@@ -116,12 +120,16 @@ function MaintenancePage() {
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
     setIsSubmitting(true)
+    const payload: MaintenanceInput = {
+      ...form,
+      description: form.description || null,
+    }
     try {
       if (editingId) {
-        const updated = await api.updateMaintenance(editingId, form)
+        const updated = await api.updateMaintenance(editingId, payload)
         setRecords((prev) => prev.map((record) => (record.id === editingId ? updated : record)))
       } else {
-        const created = await api.createMaintenance(form)
+        const created = await api.createMaintenance(payload)
         setRecords((prev) => [...prev, created])
       }
       closeForm()
@@ -133,7 +141,7 @@ function MaintenancePage() {
   }
 
   async function handleDelete(record: MaintenanceRecord) {
-    if (!window.confirm(`Delete maintenance record "${record.name}"?`)) return
+    if (!window.confirm(`Delete this ${recordLabel(record)} maintenance record?`)) return
     try {
       await api.deleteMaintenance(record.id)
       setRecords((prev) => prev.filter((existing) => existing.id !== record.id))
@@ -168,16 +176,8 @@ function MaintenancePage() {
             onSubmit={handleSubmit}
           >
             <h2 id="maintenance-form-title">{editingId ? 'Edit record' : 'New record'}</h2>
-            <input
-              ref={nameInputRef}
-              type="text"
-              placeholder="Name"
-              aria-label="Name"
-              value={form.name}
-              onChange={(event) => setForm((f) => ({ ...f, name: event.target.value }))}
-              required
-            />
             <select
+              ref={typeSelectRef}
               aria-label="Type"
               value={form.type}
               onChange={(event) =>
@@ -195,10 +195,12 @@ function MaintenancePage() {
               type="number"
               min="0"
               step="0.01"
-              placeholder="Cost"
+              placeholder="Cost (e.g. 1500.00)"
               aria-label="Cost"
-              value={form.cost}
-              onChange={(event) => setForm((f) => ({ ...f, cost: Number(event.target.value) }))}
+              value={form.cost === 0 ? '' : form.cost}
+              onChange={(event) =>
+                setForm((f) => ({ ...f, cost: event.target.value === '' ? 0 : Number(event.target.value) }))
+              }
               required
             />
             <input
@@ -232,6 +234,12 @@ function MaintenancePage() {
                 </option>
               ))}
             </select>
+            <textarea
+              placeholder="Description (optional details about this record)"
+              aria-label="Description"
+              value={form.description ?? ''}
+              onChange={(event) => setForm((f) => ({ ...f, description: event.target.value }))}
+            />
             <div className="modal-actions">
               <button type="button" className="secondary" onClick={closeForm} disabled={isSubmitting}>
                 Cancel
@@ -253,12 +261,8 @@ function MaintenancePage() {
             aria-labelledby="maintenance-view-title"
             onClick={(event) => event.stopPropagation()}
           >
-            <h2 id="maintenance-view-title">{viewingRecord.name}</h2>
+            <h2 id="maintenance-view-title">{recordLabel(viewingRecord)}</h2>
             <dl className="detail-list">
-              <div>
-                <dt>Name</dt>
-                <dd>{viewingRecord.name}</dd>
-              </div>
               <div>
                 <dt>Type</dt>
                 <dd>{typeLabels[viewingRecord.type]}</dd>
@@ -274,6 +278,10 @@ function MaintenancePage() {
               <div>
                 <dt>Service by</dt>
                 <dd>{viewingRecord.service_by}</dd>
+              </div>
+              <div>
+                <dt>Description</dt>
+                <dd>{viewingRecord.description ?? '—'}</dd>
               </div>
               <div>
                 <dt>Car</dt>
@@ -310,7 +318,6 @@ function MaintenancePage() {
             <thead>
               <tr>
                 <th>SL</th>
-                <th>Name</th>
                 <th>Type</th>
                 <th>Cost</th>
                 <th>Service place</th>
@@ -323,7 +330,6 @@ function MaintenancePage() {
               {records.map((record, index) => (
                 <tr key={record.id}>
                   <td>{index + 1}</td>
-                  <td>{record.name}</td>
                   <td>{typeLabels[record.type]}</td>
                   <td>{record.cost}</td>
                   <td>{record.service_place}</td>
@@ -333,7 +339,7 @@ function MaintenancePage() {
                     <button
                       type="button"
                       className="icon-btn"
-                      aria-label={`View ${record.name}`}
+                      aria-label={`View ${recordLabel(record)}`}
                       title="View"
                       onClick={() => setViewingRecord(record)}
                     >
@@ -342,7 +348,7 @@ function MaintenancePage() {
                     <button
                       type="button"
                       className="icon-btn"
-                      aria-label={`Edit ${record.name}`}
+                      aria-label={`Edit ${recordLabel(record)}`}
                       title="Edit"
                       onClick={() => openEditForm(record)}
                     >
@@ -351,7 +357,7 @@ function MaintenancePage() {
                     <button
                       type="button"
                       className="icon-btn danger"
-                      aria-label={`Delete ${record.name}`}
+                      aria-label={`Delete ${recordLabel(record)}`}
                       title="Delete"
                       onClick={() => handleDelete(record)}
                     >

@@ -9,11 +9,11 @@ dashboard as a deduction.
 | Field         | Type          | Required | Notes |
 |---------------|---------------|----------|-------|
 | id            | uuid (PK)     | yes      | |
-| name          | varchar       | yes      | e.g. "Front tyre replacement" |
 | type          | varchar       | yes      | enum: `service`, `battery`, `tyre`, `spare_parts`, `engine_oil` |
 | cost          | numeric(12,2) | yes      | |
 | service_place | varchar       | yes      | garage/shop name |
 | service_by    | varchar       | yes      | mechanic/person who performed the service |
+| description   | text          | no       | **(changed)** free-text detail about the record; replaces the original `name` field per user request — there is no separate short-title field, `type` + `description` together identify the record |
 | car_id        | uuid (FK)     | yes      | → `cars.id` — **(added)** not in the original field list, but a maintenance record must be tied to a car; without it the record can't be attributed anywhere |
 | created_at    | timestamptz   | yes      | |
 | updated_at    | timestamptz   | yes      | |

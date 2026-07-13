@@ -18,6 +18,18 @@ const typeLabels: Record<string, string> = {
   other: 'Other',
 }
 
+const maintenanceTypeLabels: Record<string, string> = {
+  service: 'Service',
+  battery: 'Battery',
+  tyre: 'Tyre',
+  spare_parts: 'Spare parts',
+  engine_oil: 'Engine oil',
+}
+
+function maintenanceRecordLabel(record: MaintenanceRecord) {
+  return `${maintenanceTypeLabels[record.type]} — ${record.service_place}`
+}
+
 const emptyForm: PaymentInput = {
   type: 'monthly_fair',
   associated_maintenance: null,
@@ -78,7 +90,8 @@ function PaymentsPage() {
 
   function maintenanceLabel(id: string | null) {
     if (!id) return '—'
-    return maintenanceRecords.find((record) => record.id === id)?.name ?? '—'
+    const record = maintenanceRecords.find((r) => r.id === id)
+    return record ? maintenanceRecordLabel(record) : '—'
   }
 
   function carDocLabel(id: string | null) {
@@ -247,7 +260,7 @@ function PaymentsPage() {
                 <option value="">No linked maintenance record</option>
                 {maintenanceOptions.map((record) => (
                   <option key={record.id} value={record.id}>
-                    {record.name}
+                    {maintenanceRecordLabel(record)}
                   </option>
                 ))}
               </select>

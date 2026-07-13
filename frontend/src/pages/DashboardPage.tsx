@@ -343,13 +343,14 @@ function DashboardPage() {
                     <th>SL</th>
                     <th>Date</th>
                     <th>Car</th>
+                    <th>Payment type</th>
                     <th>Amount</th>
                   </tr>
                 </thead>
                 <tbody>
                   {sortedPayments.length === 0 && (
                     <tr>
-                      <td colSpan={4}>No payments in range</td>
+                      <td colSpan={5}>No payments in range</td>
                     </tr>
                   )}
                   {sortedPayments.map((payment, index) => {
@@ -360,6 +361,7 @@ function DashboardPage() {
                         <td>{index + 1}</td>
                         <td>{formatDate(payment.payment_date)}</td>
                         <td>{carLabel(payment.car_id)}</td>
+                        <td>{typeLabels[payment.type] ?? payment.type}</td>
                         <td className={signed >= 0 ? 'good' : 'critical'}>
                           {signed >= 0 ? '+' : '-'}
                           {formatAmount(Math.abs(signed))}
@@ -368,7 +370,7 @@ function DashboardPage() {
                     )
                   })}
                   <tr className="net-row">
-                    <td colSpan={3} className="net-row-label">
+                    <td colSpan={4} className="net-row-label">
                       Net
                     </td>
                     <td className={paymentsNet >= 0 ? 'good' : 'critical'}>

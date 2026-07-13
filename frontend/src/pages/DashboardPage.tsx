@@ -224,7 +224,7 @@ function DashboardPage() {
   }, [carId, dateFrom, dateTo])
 
   const carLabel = useMemo(() => {
-    const map = new Map(cars.map((car) => [car.id, `${car.brand} ${car.model_name ?? ''}`.trim()]))
+    const map = new Map(cars.map((car) => [car.id, car.registration_number ?? '—']))
     return (id: string) => map.get(id) ?? '—'
   }, [cars])
 
@@ -242,7 +242,7 @@ function DashboardPage() {
             <option value="">All cars</option>
             {cars.map((car) => (
               <option key={car.id} value={car.id}>
-                {`${car.brand} ${car.model_name ?? ''}`.trim()}
+                {car.registration_number ?? '—'}
               </option>
             ))}
           </select>
@@ -293,7 +293,7 @@ function DashboardPage() {
             </div>
           </div>
 
-          {summary.by_car && summary.by_car.length > 0 && (
+          {carId ? (
             <div className="data-table-wrap card">
               <table className="data-table">
                 <thead>
@@ -306,18 +306,46 @@ function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {summary.by_car.map((row, index) => (
-                    <tr key={row.car_id}>
-                      <td>{index + 1}</td>
-                      <td>{carLabel(row.car_id)}</td>
-                      <td>{formatAmount(row.income)}</td>
-                      <td>{formatAmount(row.expense)}</td>
-                      <td className={row.net >= 0 ? 'good' : 'critical'}>{formatAmount(row.net)}</td>
-                    </tr>
-                  ))}
+                  <tr key={carId}>
+                    <td>1</td>
+                    <td>{carLabel(carId)}</td>
+                    <td>{formatAmount(summary.total_income)}</td>
+                    <td>{formatAmount(summary.total_expense)}</td>
+                    <td className={summary.net_revenue >= 0 ? 'good' : 'critical'}>
+                      {formatAmount(summary.net_revenue)}
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
+          ) : (
+            summary.by_car &&
+            summary.by_car.length > 0 && (
+              <div className="data-table-wrap card">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>SL</th>
+                      <th>Car</th>
+                      <th>Income</th>
+                      <th>Expense</th>
+                      <th>Net</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {summary.by_car.map((row, index) => (
+                      <tr key={row.car_id}>
+                        <td>{index + 1}</td>
+                        <td>{carLabel(row.car_id)}</td>
+                        <td>{formatAmount(row.income)}</td>
+                        <td>{formatAmount(row.expense)}</td>
+                        <td className={row.net >= 0 ? 'good' : 'critical'}>{formatAmount(row.net)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
           )}
         </>
       )}

@@ -95,7 +95,8 @@
   letter-spacing: 0.04em;
 }
 
-.data-table th:last-child {
+.data-table th:last-child,
+.data-table td:last-child {
   text-align: right;
 }
 

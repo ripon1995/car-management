@@ -32,8 +32,8 @@ function toApiError(err: unknown): ApiError {
   return err instanceof ApiError ? err : new ApiError(0, 'Something went wrong', 'Something went wrong')
 }
 
-function formatAmount(value: number) {
-  return value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+function formatAmount(value: number | string) {
+  return Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 function formatPeriod(period: string) {
@@ -57,7 +57,7 @@ function DonutChart({ summary }: { summary: RevenueSummary }) {
 
   const segments = TYPE_ORDER.map((type) => ({
     type,
-    amount: summary.by_type.find((entry) => entry.type === type)?.amount ?? 0,
+    amount: Number(summary.by_type.find((entry) => entry.type === type)?.amount ?? 0),
   })).filter((segment) => segment.amount > 0)
 
   const total = segments.reduce((sum, segment) => sum + segment.amount, 0)
@@ -264,7 +264,7 @@ function DashboardPage() {
   const paymentsNet = useMemo(
     () =>
       sortedPayments.reduce(
-        (sum, payment) => sum + (payment.type === INCOME_TYPE ? payment.amount : -payment.amount),
+        (sum, payment) => sum + (payment.type === INCOME_TYPE ? Number(payment.amount) : -Number(payment.amount)),
         0,
       ),
     [sortedPayments],
@@ -353,7 +353,8 @@ function DashboardPage() {
                     </tr>
                   )}
                   {sortedPayments.map((payment, index) => {
-                    const signed = payment.type === INCOME_TYPE ? payment.amount : -payment.amount
+                    const signed =
+                      payment.type === INCOME_TYPE ? Number(payment.amount) : -Number(payment.amount)
                     return (
                       <tr key={payment.id}>
                         <td>{index + 1}</td>

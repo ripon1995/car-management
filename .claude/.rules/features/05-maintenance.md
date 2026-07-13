@@ -34,7 +34,9 @@ dashboard as a deduction.
 
 ## Business Rules & Validation
 - `cost` must be >= 0.
-- Creating a Maintenance record should also create the linked Payment
-  record (type `service`) so it's reflected in Revenue — confirm whether
-  this happens automatically server-side or is a separate manual step in
-  the UI.
+- **(resolved)** Creating a Maintenance record does **not** automatically
+  create the linked Payment record. The user is expected to create the
+  Payment (type `service`, `associated_maintenance` = this record's id)
+  separately on the Payments page — this matches the plain-CRUD pattern of
+  every other feature. Don't add auto-creation without re-confirming with
+  the user first.

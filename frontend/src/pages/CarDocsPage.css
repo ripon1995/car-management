@@ -1,0 +1,10 @@
+.car-docs-page {
+  align-items: stretch;
+  text-align: left;
+  width: 100%;
+}
+
+.car-docs-page .expired {
+  color: var(--status-critical);
+  font-weight: 600;
+}

@@ -4,13 +4,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project state
 
-Backend is scaffolded (FastAPI app, separate Auth/User JWT login) with
-Car Owner, Vendor, Driver, and Car CRUD fully built. Frontend is scaffolded
-too (Vite + React + TypeScript, routing, auth pages, nav shell) with Car
-Owner CRUD as the first fully-built feature page, followed by Vendor,
-Driver, and Car pages built the same way — see "Frontend architecture"
-below for the conventions they set that the remaining feature pages
-(Maintenance, Car Docs, Payment, Revenue dashboard) should follow.
+All 8 business features plus Auth are fully built on both sides. Backend
+(FastAPI app, separate Auth/User JWT login): Car Owner, Vendor, Driver,
+Car, Maintenance, Car Docs, and Payment CRUD, plus the read-only Revenue
+aggregation endpoint. Frontend (Vite + React + TypeScript, routing, auth
+pages, nav shell): Car Owner, Vendor, Driver, Car, Maintenance, Car Docs,
+and Payment pages all built to the same conventions (see "Frontend
+architecture" below), plus the Revenue dashboard at `/dashboard`
+(`DashboardPage.tsx`) with hand-rolled SVG donut/bar charts. Maintenance
+and Car Docs do **not** auto-create their linked Payment row — that was an
+open question in the feature docs, resolved as: Payments are created
+manually/independently on the Payments page (matches the plain-CRUD
+pattern of every other feature; user's explicit call, don't revisit
+without asking).
 
 **No unit tests in this project by explicit user instruction** — don't add
 a test suite unless asked.
@@ -28,7 +34,10 @@ Run from `backend/`, with the venv active
   `op.create_table`/etc. manually, following `alembic/versions/0001_create_car_owners.py`
   as a template — `0005_create_cars.py` is the template for a table with FKs
   to other feature tables, including the `unique=True` index pattern for
-  `engine_number`/`chassis_number`)
+  `engine_number`/`chassis_number`; `0008_create_payments.py` is the
+  template for a table with two optional FKs into two different sibling
+  feature tables, plus non-unique filter indexes via plain
+  `op.create_index`)
 
 Dependencies are declared in `backend/pyproject.toml` (`pip install -e ".[dev]"`).
 
@@ -74,8 +83,8 @@ cross-cutting infrastructure lives outside `app/features/`.
 - `app/db/` — async SQLAlchemy engine/session (`asyncpg` driver) and the
   shared declarative `Base`.
 - Each feature package follows a **repository → service → router**
-  layering — this is the template to copy for the remaining features
-  (Maintenance, Car Docs, Payment):
+  layering — every feature (including Maintenance, Car Docs, and Payment)
+  follows this template:
   - `models.py` — SQLAlchemy model(s).
   - `schemas.py` — Pydantic request/response models.
   - `repository.py` — a `<Feature>Repository` class wrapping the
@@ -123,7 +132,9 @@ cross-cutting infrastructure lives outside `app/features/`.
   the raw FK `IntegrityError` from Postgres) — copy this pattern for any
   other feature whose deletion must be restricted while referenced
   elsewhere. `VendorService` additionally validates `monthly_fare >= 0`
-  (`ValidationException`).
+  (`ValidationException`). `CarService.delete()` applies the same pattern
+  in the other direction, checking `MaintenanceRecord`/`CarDoc`/`Payment`
+  for any row whose `car_id` points at the car being deleted.
 - `app/features/cars/` — the hub entity, with FKs to `car_owners`
   (`owner_id`, required), `vendors` (`vendor_id`, optional), and `drivers`
   (`driver_id`, optional). `CarService` takes all three repositories as
@@ -140,6 +151,49 @@ cross-cutting infrastructure lives outside `app/features/`.
   can `PUT` just `{"vendor_id": ...}` — same convention as `car_owners`.
   No pagination/filtering on `GET /cars` yet, matching `car_owners`'
   current (also not-yet-implemented) state.
+- `app/features/maintenance/` and `app/features/car_docs/` — car-scoped
+  records, both required FK `car_id` → `cars.id` validated via
+  `CarRepository`. `MaintenanceService` validates `type` against a fixed
+  tuple (`service`/`battery`/`tyre`/`spare_parts`/`engine_oil`) and
+  `cost >= 0`; `CarDocService` validates `cost >= 0` only (`expiry_date` is
+  a plain `date`, no enum). Both routers' `GET /` accepts filter query
+  params (`car_id`, plus `type` for Maintenance and
+  `name`/`expiring_before` for Car Docs) — unlike `cars`/`car_owners`,
+  these were built with filtering from the start since the feature docs
+  call for it explicitly. Both services' `delete()` block with
+  `ConflictException` if a `Payment` row references them via
+  `associated_maintenance`/`associated_cardocs` (imported inline inside
+  the method, not at module level, to avoid a circular import with
+  `app.features.payments.service` which imports these two features'
+  repositories).
+- `app/features/payments/` — the money-movement ledger. Required FKs:
+  `car_id` → `cars.id`; optional FKs: `associated_maintenance` →
+  `maintenance_records.id`, `associated_cardocs` → `car_docs.id`.
+  `PaymentService` validates `type` (`service`/`document`/`monthly_fair`/
+  `other`), `amount >= 0`, that `associated_maintenance` is only set when
+  `type == "service"` and `associated_cardocs` only when
+  `type == "document"` (`ValidationException`), and that every referenced
+  id actually exists (`NotFoundException`, via `CarRepository`/
+  `MaintenanceRepository`/`CarDocRepository`). **Maintenance/Car Docs do
+  not auto-create a Payment row** — that was flagged as an open question
+  in `05-maintenance.md`/`07-payment.md` and resolved as manual (see
+  "Project state"); don't add auto-creation without re-confirming with the
+  user first. `GET /payments` filters by `car_id`, `type`, and a
+  `date_from`/`date_to` range over `payment_date`.
+- `app/features/revenue/` — read-only, **no `models.py`/`migration`**:
+  `RevenueService.get_summary()` takes the same `car_id`/date-range filters
+  as Payments (via `PaymentRepository.list_all()`), fetches the matching
+  Payment rows, and aggregates them in Python (not SQL) into
+  `total_income`/`total_expense`/`net_revenue`, a `by_type` breakdown, a
+  `by_period` breakdown (grouped by `payment_date.strftime("%Y-%m")`), and
+  a `by_car` breakdown that's `null` whenever a single `car_id` is
+  filtered (comparing cars only makes sense when not already scoped to
+  one). `type == "monthly_fair"` is income; every other type is expense —
+  `INCOME_TYPE` constant in `service.py` is the single source of truth for
+  that split, don't duplicate the check. Mounted at `GET /api/v1/revenue`
+  with `from`/`to` query param aliases (`Query(alias="from")` — `from` is
+  a Python keyword) rather than `date_from`/`date_to`, matching the exact
+  param names in `08-revenue.md`.
 - `app/api.py` — thin aggregator that `include_router`s each feature's
   router(s); mounted under `/api/v1` in `app/main.py` (the version prefix
   is deliberate — keep it, don't flatten to bare `/api`). **When adding a
@@ -155,9 +209,13 @@ cross-cutting infrastructure lives outside `app/features/`.
 - `alembic/env.py` imports each feature's `models` module explicitly (e.g.
   `app.features.auth.models`, `app.features.car_owners.models`,
   `app.features.vendors.models`, `app.features.drivers.models`,
-  `app.features.cars.models`) so its tables register on `Base.metadata`
-  before migrations run — add the new import there too when adding a
-  feature.
+  `app.features.cars.models`, `app.features.maintenance.models`,
+  `app.features.car_docs.models`, `app.features.payments.models`) so its
+  tables register on `Base.metadata` before migrations run — add the new
+  import there too when adding a feature. Migrations `0006`–`0008` create
+  `maintenance_records`/`car_docs`/`payments` in that order (FK
+  dependency order: `payments` references both `maintenance_records` and
+  `car_docs`); `revenue` has no migration since it has no table.
 
 **Known environment quirk:** this venv is Python 3.14 (very new). Standard
 `passlib[bcrypt]` fails at runtime here (`AttributeError: module 'bcrypt'
@@ -176,10 +234,17 @@ The frontend is **feature-first** too, mirroring the backend split — each
 business entity gets a page, an API module, and (if it needs more than
 primitive fields) a types file. `app/features/car_owners/` on the backend
 maps to `src/pages/CarOwnersPage.tsx` + `src/api/carOwners.ts` +
-`src/types/carOwner.ts` on the frontend; `vendors`/`drivers`/`cars` follow
-the same layout (`VendorsPage.tsx`/`DriversPage.tsx`/`CarsPage.tsx` +
-matching `api/`/`types/` modules). Follow this layout for the remaining
-features (Maintenance, Car Docs, Payment, Revenue dashboard) too.
+`src/types/carOwner.ts` on the frontend; `vendors`/`drivers`/`cars`/
+`maintenance`/`car_docs`/`payments` all follow the same layout
+(`VendorsPage.tsx`/`DriversPage.tsx`/`CarsPage.tsx`/`MaintenancePage.tsx`/
+`CarDocsPage.tsx`/`PaymentsPage.tsx` + matching `api/`/`types/` modules).
+Revenue is the one exception, since it's a read-only dashboard rather than
+a CRUD resource: it's `src/pages/DashboardPage.tsx` (mounted at the
+existing `/dashboard` route/nav entry, not a new `/revenue` route) +
+`src/api/revenue.ts` + `src/types/revenue.ts`, and its filter controls
+(`car_id`/`from`/`to`, mapping to `GET /revenue`'s query params) sit in
+`.page-header`'s right-hand slot in place of the usual `.btn-primary`
+create button, since there's nothing to create.
 
 - `src/api/client.ts` — `request<T>(path, options)` (fetch wrapper: base
   URL, JSON headers, error → `ApiError` mapping, 401 →
@@ -262,6 +327,31 @@ features (Maintenance, Car Docs, Payment, Revenue dashboard) too.
 - Auth/session state lives in `src/store/authStore.ts` (zustand), not
   per-page state — feature pages only hold their own list/form/loading
   state locally with `useState`, matching `CarOwnersPage.tsx`.
+- `PaymentsPage.tsx`'s form conditionally renders the `associated_maintenance`
+  select only when `type === 'service'` and `associated_cardocs` only when
+  `type === 'document'` (mirroring the backend's validation), clearing the
+  other one whenever `type` changes; both selects filter their options
+  down to the currently-selected `car_id` when one is chosen. Reuse this
+  conditional-field-by-type pattern for any future feature whose form
+  fields depend on a sibling `type`/enum field.
+- `CarDocsPage.tsx` colors an already-past `expiry_date` cell with
+  `.expired` (`var(--status-critical)`, defined in the page's own CSS
+  file rather than `App.css` since no other feature needs it yet) — a
+  light touch on top of the standard table, not a full "expiring soon"
+  filter/reminder system (that's flagged as suggested-not-required in
+  `06-car-docs.md`; ask before building it out further).
+- `DashboardPage.tsx` (the Revenue dashboard) has **no chart library
+  dependency** — `package.json` intentionally stays at
+  `react`/`react-router-dom`/`zustand` only, so the by-type donut and
+  by-period grouped bar chart are hand-rolled inline SVG (`<circle
+  strokeDasharray>` arcs for the donut, `<rect>` bars for the bar chart),
+  colored from the categorical palette in
+  `.claude/skills` → dataviz's `references/palette.md` (validated via that
+  skill's `scripts/validate_palette.js`) rather than the app's single
+  `--accent` token, since this is the app's first multi-series
+  visualization. If a future feature needs another chart, reuse this
+  hand-rolled-SVG approach rather than introducing a chart library without
+  checking with the user first.
 
 ## What this project is
 

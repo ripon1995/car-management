@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import Depends
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import ConflictException, NotFoundException, ValidationException
@@ -71,7 +72,24 @@ class CarService:
 
     async def delete(self, car_id: uuid.UUID) -> None:
         car = await self.get_by_id(car_id)
+        await self._check_not_referenced(car_id)
         await self.repository.delete(car)
+
+    async def _check_not_referenced(self, car_id: uuid.UUID) -> None:
+        from app.features.car_docs.models import CarDoc
+        from app.features.maintenance.models import MaintenanceRecord
+        from app.features.payments.models import Payment
+
+        for model, label in (
+            (MaintenanceRecord, "maintenance records"),
+            (CarDoc, "car docs"),
+            (Payment, "payments"),
+        ):
+            referenced = await self.repository.db.scalar(
+                select(model.id).where(model.car_id == car_id).limit(1)
+            )
+            if referenced is not None:
+                raise ConflictException(f"Cannot delete a car that has {label}")
 
     async def _validate_model_year(self, model_year: int) -> None:
         current_year = datetime.now(timezone.utc).year

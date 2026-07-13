@@ -40,6 +40,12 @@ Run from `backend/`, with the venv active
   `op.create_index`)
 
 Dependencies are declared in `backend/pyproject.toml` (`pip install -e ".[dev]"`).
+`backend/requirements.txt` is a pinned `pip freeze` snapshot of that same
+venv, kept for reproducible installs (`pip install -r requirements.txt`);
+`pyproject.toml` is still the source of truth for *which* packages are
+direct dependencies vs. transitive — re-freeze `requirements.txt` after
+changing `pyproject.toml`'s `dependencies`/`optional-dependencies`, don't
+hand-edit it.
 
 **Known Supabase gotcha:** the direct-connection host
 (`db.<project-ref>.supabase.co`) often only resolves via IPv6, which fails

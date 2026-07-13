@@ -20,14 +20,14 @@ class CarDocRepository:
     async def list_all(
         self,
         car_id: uuid.UUID | None = None,
-        name: str | None = None,
+        doc_type: str | None = None,
         expiring_before: date | None = None,
     ) -> list[CarDoc]:
         query = select(CarDoc).order_by(CarDoc.created_at)
         if car_id is not None:
             query = query.where(CarDoc.car_id == car_id)
-        if name is not None:
-            query = query.where(CarDoc.name == name)
+        if doc_type is not None:
+            query = query.where(CarDoc.doc_type == doc_type)
         if expiring_before is not None:
             query = query.where(CarDoc.expiry_date < expiring_before)
         result = await self.db.scalars(query)

@@ -14,11 +14,11 @@ router = APIRouter(dependencies=[Depends(get_current_user)])
 @router.get("", response_model=list[CarDocRead])
 async def list_car_docs(
     car_id: uuid.UUID | None = None,
-    name: str | None = None,
+    doc_type: str | None = None,
     expiring_before: date | None = None,
     service: CarDocService = Depends(get_car_doc_service),
 ) -> list[CarDoc]:
-    return await service.list_all(car_id=car_id, name=name, expiring_before=expiring_before)
+    return await service.list_all(car_id=car_id, doc_type=doc_type, expiring_before=expiring_before)
 
 
 @router.post("", response_model=CarDocRead, status_code=status.HTTP_201_CREATED)

@@ -8,7 +8,7 @@ fitness certificate) including expiry and cost.
 | Field       | Type          | Required | Notes |
 |-------------|---------------|----------|-------|
 | id          | uuid (PK)     | yes      | |
-| name        | varchar       | yes      | e.g. "Registration", "Insurance", "Fitness Certificate" |
+| doc_type    | varchar       | yes      | **(changed)** enum, replaces the original `name` field per user request: `tax_token`, `fitness`, `route_permit`, `registration_certificate` |
 | expiry_date | date          | yes      | |
 | cost        | numeric(12,2) | yes      | |
 | car_id      | uuid (FK)     | yes      | → `cars.id` |
@@ -19,7 +19,7 @@ fitness certificate) including expiry and cost.
 - `car_id` → one Car has many Car Docs.
 
 ## API Endpoints
-- `GET /api/v1/car-docs` — list, filter by `car_id`, `name`, and
+- `GET /api/v1/car-docs` — list, filter by `car_id`, `doc_type`, and
   `expiring_before` (date) for renewal-due queries; paginated.
 - `POST /api/v1/car-docs`
 - `GET /api/v1/car-docs/{id}`

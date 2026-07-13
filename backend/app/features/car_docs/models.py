@@ -13,7 +13,7 @@ class CarDoc(Base):
     __tablename__ = "car_docs"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name: Mapped[str] = mapped_column(String, nullable=False)
+    doc_type: Mapped[str] = mapped_column(String, nullable=False)
     expiry_date: Mapped[date] = mapped_column(Date, nullable=False)
     cost: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     car_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("cars.id"), nullable=False)

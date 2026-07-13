@@ -30,6 +30,17 @@ function maintenanceRecordLabel(record: MaintenanceRecord) {
   return `${maintenanceTypeLabels[record.type]} — ${record.service_place}`
 }
 
+const docTypeLabels: Record<string, string> = {
+  tax_token: 'Tax token',
+  fitness: 'Fitness',
+  route_permit: 'Route permit',
+  registration_certificate: 'Registration certificate',
+}
+
+function carDocRecordLabel(doc: CarDoc) {
+  return `${docTypeLabels[doc.doc_type]} — ${doc.expiry_date}`
+}
+
 const emptyForm: PaymentInput = {
   type: 'monthly_fair',
   associated_maintenance: null,
@@ -96,7 +107,8 @@ function PaymentsPage() {
 
   function carDocLabel(id: string | null) {
     if (!id) return '—'
-    return carDocs.find((doc) => doc.id === id)?.name ?? '—'
+    const doc = carDocs.find((d) => d.id === id)
+    return doc ? carDocRecordLabel(doc) : '—'
   }
 
   function openCreateForm() {
@@ -276,7 +288,7 @@ function PaymentsPage() {
                 <option value="">No linked car doc</option>
                 {carDocOptions.map((doc) => (
                   <option key={doc.id} value={doc.id}>
-                    {doc.name}
+                    {carDocRecordLabel(doc)}
                   </option>
                 ))}
               </select>

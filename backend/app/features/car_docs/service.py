@@ -10,7 +10,7 @@ from app.core.exceptions import ConflictException, NotFoundException, Validation
 from app.db.session import get_db
 from app.features.car_docs.models import CarDoc
 from app.features.car_docs.repository import CarDocRepository
-from app.features.car_docs.schemas import CarDocCreate, CarDocUpdate
+from app.features.car_docs.schemas import DOC_TYPES, CarDocCreate, CarDocUpdate
 from app.features.cars.repository import CarRepository
 
 
@@ -22,6 +22,7 @@ class CarDocService:
         self.car_repository = car_repository
 
     async def create(self, payload: CarDocCreate) -> CarDoc:
+        self._validate_doc_type(payload.doc_type)
         self._validate_cost(payload.cost)
         await self._validate_car(payload.car_id)
         return await self.repository.create(**payload.model_dump())
@@ -29,10 +30,12 @@ class CarDocService:
     async def list_all(
         self,
         car_id: uuid.UUID | None = None,
-        name: str | None = None,
+        doc_type: str | None = None,
         expiring_before: date | None = None,
     ) -> list[CarDoc]:
-        return await self.repository.list_all(car_id=car_id, name=name, expiring_before=expiring_before)
+        return await self.repository.list_all(
+            car_id=car_id, doc_type=doc_type, expiring_before=expiring_before
+        )
 
     async def get_by_id(self, car_doc_id: uuid.UUID) -> CarDoc:
         car_doc = await self.repository.get_by_id(car_doc_id)
@@ -44,6 +47,8 @@ class CarDocService:
         car_doc = await self.get_by_id(car_doc_id)
         updates = payload.model_dump(exclude_unset=True)
 
+        if "doc_type" in updates:
+            self._validate_doc_type(updates["doc_type"])
         if "cost" in updates:
             self._validate_cost(updates["cost"])
         if "car_id" in updates:
@@ -61,6 +66,11 @@ class CarDocService:
         if linked_payment is not None:
             raise ConflictException("Cannot delete a car doc that has a linked payment")
         await self.repository.delete(car_doc)
+
+    @staticmethod
+    def _validate_doc_type(doc_type: str) -> None:
+        if doc_type not in DOC_TYPES:
+            raise ValidationException(f"doc_type must be one of {', '.join(DOC_TYPES)}")
 
     @staticmethod
     def _validate_cost(cost: Decimal) -> None:

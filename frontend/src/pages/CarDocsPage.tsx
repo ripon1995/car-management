@@ -3,15 +3,22 @@ import { CarDocsIcon, PlusIcon, ViewIcon, EditIcon, DeleteIcon } from '../compon
 import ErrorDialog from '../components/ErrorDialog'
 import { ApiError } from '../errors/api'
 import * as api from '../api'
-import type { CarDoc, CarDocInput } from '../types/carDoc'
+import { DOC_TYPES, type CarDoc, type CarDocInput } from '../types/carDoc'
 import type { Car } from '../types/car'
 import './CarDocsPage.css'
 
 const todayIso = new Date().toISOString().slice(0, 10)
 
+const docTypeLabels: Record<string, string> = {
+  tax_token: 'Tax token',
+  fitness: 'Fitness',
+  route_permit: 'Route permit',
+  registration_certificate: 'Registration certificate',
+}
+
 const emptyForm: CarDocInput = {
-  name: '',
-  expiry_date: todayIso,
+  doc_type: 'registration_certificate',
+  expiry_date: '',
   cost: 0,
   car_id: '',
 }
@@ -30,7 +37,7 @@ function CarDocsPage() {
   const [form, setForm] = useState<CarDocInput>(emptyForm)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [viewingDoc, setViewingDoc] = useState<CarDoc | null>(null)
-  const nameInputRef = useRef<HTMLInputElement>(null)
+  const docTypeSelectRef = useRef<HTMLSelectElement>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -58,6 +65,10 @@ function CarDocsPage() {
     return `${car.brand} ${car.model_name ?? ''}`.trim()
   }
 
+  function docLabel(doc: CarDoc) {
+    return `${docTypeLabels[doc.doc_type]} — ${carLabel(doc.car_id)}`
+  }
+
   function openCreateForm() {
     setEditingId(null)
     setForm(emptyForm)
@@ -68,7 +79,7 @@ function CarDocsPage() {
     setViewingDoc(null)
     setEditingId(doc.id)
     setForm({
-      name: doc.name,
+      doc_type: doc.doc_type,
       expiry_date: doc.expiry_date,
       cost: doc.cost,
       car_id: doc.car_id,
@@ -84,7 +95,7 @@ function CarDocsPage() {
 
   useEffect(() => {
     if (!isFormOpen) return
-    nameInputRef.current?.focus()
+    docTypeSelectRef.current?.focus()
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') closeForm()
@@ -123,7 +134,7 @@ function CarDocsPage() {
   }
 
   async function handleDelete(doc: CarDoc) {
-    if (!window.confirm(`Delete car doc "${doc.name}"?`)) return
+    if (!window.confirm(`Delete this ${docLabel(doc)} doc?`)) return
     try {
       await api.deleteCarDoc(doc.id)
       setDocs((prev) => prev.filter((existing) => existing.id !== doc.id))
@@ -158,32 +169,46 @@ function CarDocsPage() {
             onSubmit={handleSubmit}
           >
             <h2 id="car-doc-form-title">{editingId ? 'Edit car doc' : 'New car doc'}</h2>
-            <input
-              ref={nameInputRef}
-              type="text"
-              placeholder="Name (e.g. Registration, Insurance)"
-              aria-label="Name"
-              value={form.name}
-              onChange={(event) => setForm((f) => ({ ...f, name: event.target.value }))}
+            <select
+              ref={docTypeSelectRef}
+              aria-label="Doc type"
+              value={form.doc_type}
+              onChange={(event) =>
+                setForm((f) => ({ ...f, doc_type: event.target.value as CarDocInput['doc_type'] }))
+              }
               required
-            />
-            <input
-              type="date"
-              aria-label="Expiry date"
-              value={form.expiry_date}
-              onChange={(event) => setForm((f) => ({ ...f, expiry_date: event.target.value }))}
-              required
-            />
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="Cost"
-              aria-label="Cost"
-              value={form.cost}
-              onChange={(event) => setForm((f) => ({ ...f, cost: Number(event.target.value) }))}
-              required
-            />
+            >
+              {DOC_TYPES.map((docType) => (
+                <option key={docType} value={docType}>
+                  {docTypeLabels[docType]}
+                </option>
+              ))}
+            </select>
+            <div className="field-with-hint">
+              <input
+                type="date"
+                aria-label="Expiry date"
+                value={form.expiry_date}
+                onChange={(event) => setForm((f) => ({ ...f, expiry_date: event.target.value }))}
+                required
+              />
+              <span className="field-hint">Expiry date — format YYYY-MM-DD</span>
+            </div>
+            <div className="field-with-hint">
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Cost (e.g. 1500.00)"
+                aria-label="Cost"
+                value={form.cost === 0 ? '' : form.cost}
+                onChange={(event) =>
+                  setForm((f) => ({ ...f, cost: event.target.value === '' ? 0 : Number(event.target.value) }))
+                }
+                required
+              />
+              <span className="field-hint">Cost to renew/obtain this document</span>
+            </div>
             <select
               aria-label="Car"
               value={form.car_id}
@@ -220,11 +245,11 @@ function CarDocsPage() {
             aria-labelledby="car-doc-view-title"
             onClick={(event) => event.stopPropagation()}
           >
-            <h2 id="car-doc-view-title">{viewingDoc.name}</h2>
+            <h2 id="car-doc-view-title">{docLabel(viewingDoc)}</h2>
             <dl className="detail-list">
               <div>
-                <dt>Name</dt>
-                <dd>{viewingDoc.name}</dd>
+                <dt>Doc type</dt>
+                <dd>{docTypeLabels[viewingDoc.doc_type]}</dd>
               </div>
               <div>
                 <dt>Expiry date</dt>
@@ -269,7 +294,7 @@ function CarDocsPage() {
             <thead>
               <tr>
                 <th>SL</th>
-                <th>Name</th>
+                <th>Doc type</th>
                 <th>Expiry date</th>
                 <th>Cost</th>
                 <th>Car</th>
@@ -280,7 +305,7 @@ function CarDocsPage() {
               {docs.map((doc, index) => (
                 <tr key={doc.id}>
                   <td>{index + 1}</td>
-                  <td>{doc.name}</td>
+                  <td>{docTypeLabels[doc.doc_type]}</td>
                   <td className={doc.expiry_date < todayIso ? 'expired' : undefined}>
                     {doc.expiry_date}
                   </td>
@@ -290,7 +315,7 @@ function CarDocsPage() {
                     <button
                       type="button"
                       className="icon-btn"
-                      aria-label={`View ${doc.name}`}
+                      aria-label={`View ${docLabel(doc)}`}
                       title="View"
                       onClick={() => setViewingDoc(doc)}
                     >
@@ -299,7 +324,7 @@ function CarDocsPage() {
                     <button
                       type="button"
                       className="icon-btn"
-                      aria-label={`Edit ${doc.name}`}
+                      aria-label={`Edit ${docLabel(doc)}`}
                       title="Edit"
                       onClick={() => openEditForm(doc)}
                     >
@@ -308,7 +333,7 @@ function CarDocsPage() {
                     <button
                       type="button"
                       className="icon-btn danger"
-                      aria-label={`Delete ${doc.name}`}
+                      aria-label={`Delete ${docLabel(doc)}`}
                       title="Delete"
                       onClick={() => handleDelete(doc)}
                     >

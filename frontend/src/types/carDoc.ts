@@ -1,6 +1,10 @@
+export const DOC_TYPES = ['tax_token', 'fitness', 'route_permit', 'registration_certificate'] as const
+
+export type DocType = (typeof DOC_TYPES)[number]
+
 export interface CarDoc {
   id: string
-  name: string
+  doc_type: DocType
   expiry_date: string
   cost: number
   car_id: string
@@ -9,7 +13,7 @@ export interface CarDoc {
 }
 
 export interface CarDocInput {
-  name: string
+  doc_type: DocType
   expiry_date: string
   cost: number
   car_id: string

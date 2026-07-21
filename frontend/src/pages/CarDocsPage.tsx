@@ -169,61 +169,69 @@ function CarDocsPage() {
             onSubmit={handleSubmit}
           >
             <h2 id="car-doc-form-title">{editingId ? 'Edit car doc' : 'New car doc'}</h2>
-            <select
-              ref={docTypeSelectRef}
-              aria-label="Doc type"
-              value={form.doc_type}
-              onChange={(event) =>
-                setForm((f) => ({ ...f, doc_type: event.target.value as CarDocInput['doc_type'] }))
-              }
-              required
-            >
-              {DOC_TYPES.map((docType) => (
-                <option key={docType} value={docType}>
-                  {docTypeLabels[docType]}
-                </option>
-              ))}
-            </select>
-            <div className="field-with-hint">
-              <input
-                type="date"
-                aria-label="Expiry date"
-                value={form.expiry_date}
-                onChange={(event) => setForm((f) => ({ ...f, expiry_date: event.target.value }))}
-                required
-              />
-              <span className="field-hint">Expiry date — format YYYY-MM-DD</span>
-            </div>
-            <div className="field-with-hint">
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="Cost (e.g. 1500.00)"
-                aria-label="Cost"
-                value={form.cost === 0 ? '' : form.cost}
+            <label className="form-field">
+              <span className="form-field-label">Doc type</span>
+              <select
+                ref={docTypeSelectRef}
+                value={form.doc_type}
                 onChange={(event) =>
-                  setForm((f) => ({ ...f, cost: event.target.value === '' ? 0 : Number(event.target.value) }))
+                  setForm((f) => ({ ...f, doc_type: event.target.value as CarDocInput['doc_type'] }))
                 }
                 required
-              />
-              <span className="field-hint">Cost to renew/obtain this document</span>
-            </div>
-            <select
-              aria-label="Car"
-              value={form.car_id}
-              onChange={(event) => setForm((f) => ({ ...f, car_id: event.target.value }))}
-              required
-            >
-              <option value="" disabled>
-                Select car
-              </option>
-              {cars.map((car) => (
-                <option key={car.id} value={car.id}>
-                  {`${car.brand} ${car.model_name ?? ''}`.trim()}
+              >
+                {DOC_TYPES.map((docType) => (
+                  <option key={docType} value={docType}>
+                    {docTypeLabels[docType]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="form-field">
+              <span className="form-field-label">Expiry date</span>
+              <div className="field-with-hint">
+                <input
+                  type="date"
+                  value={form.expiry_date}
+                  onChange={(event) => setForm((f) => ({ ...f, expiry_date: event.target.value }))}
+                  required
+                />
+                <span className="field-hint">Format YYYY-MM-DD</span>
+              </div>
+            </label>
+            <label className="form-field">
+              <span className="form-field-label">Cost</span>
+              <div className="field-with-hint">
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="e.g. 1500.00"
+                  value={form.cost === 0 ? '' : form.cost}
+                  onChange={(event) =>
+                    setForm((f) => ({ ...f, cost: event.target.value === '' ? 0 : Number(event.target.value) }))
+                  }
+                  required
+                />
+                <span className="field-hint">Cost to renew/obtain this document</span>
+              </div>
+            </label>
+            <label className="form-field">
+              <span className="form-field-label">Car</span>
+              <select
+                value={form.car_id}
+                onChange={(event) => setForm((f) => ({ ...f, car_id: event.target.value }))}
+                required
+              >
+                <option value="" disabled>
+                  Select car
                 </option>
-              ))}
-            </select>
+                {cars.map((car) => (
+                  <option key={car.id} value={car.id}>
+                    {`${car.brand} ${car.model_name ?? ''}`.trim()}
+                  </option>
+                ))}
+              </select>
+            </label>
             <div className="modal-actions">
               <button type="button" className="secondary" onClick={closeForm} disabled={isSubmitting}>
                 Cancel

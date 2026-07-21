@@ -151,37 +151,41 @@ function DriversPage() {
             onSubmit={handleSubmit}
           >
             <h2 id="driver-form-title">{editingId ? 'Edit driver' : 'New driver'}</h2>
-            <input
-              ref={nameInputRef}
-              type="text"
-              placeholder="Name"
-              aria-label="Name"
-              value={form.name}
-              onChange={(event) => setForm((f) => ({ ...f, name: event.target.value }))}
-              required
-            />
-            <textarea
-              placeholder="Address"
-              aria-label="Address"
-              value={form.address}
-              onChange={(event) => setForm((f) => ({ ...f, address: event.target.value }))}
-              required
-            />
-            <input
-              type="tel"
-              placeholder="Contact number"
-              aria-label="Contact number"
-              value={form.contact_number}
-              onChange={(event) => setForm((f) => ({ ...f, contact_number: event.target.value }))}
-              required
-            />
-            <input
-              type="tel"
-              placeholder="WhatsApp number (optional)"
-              aria-label="WhatsApp number"
-              value={form.whatsapp_number ?? ''}
-              onChange={(event) => setForm((f) => ({ ...f, whatsapp_number: event.target.value }))}
-            />
+            <label className="form-field">
+              <span className="form-field-label">Name</span>
+              <input
+                ref={nameInputRef}
+                type="text"
+                value={form.name}
+                onChange={(event) => setForm((f) => ({ ...f, name: event.target.value }))}
+                required
+              />
+            </label>
+            <label className="form-field">
+              <span className="form-field-label">Address</span>
+              <textarea
+                value={form.address}
+                onChange={(event) => setForm((f) => ({ ...f, address: event.target.value }))}
+                required
+              />
+            </label>
+            <label className="form-field">
+              <span className="form-field-label">Contact number</span>
+              <input
+                type="tel"
+                value={form.contact_number}
+                onChange={(event) => setForm((f) => ({ ...f, contact_number: event.target.value }))}
+                required
+              />
+            </label>
+            <label className="form-field">
+              <span className="form-field-label">WhatsApp number (optional)</span>
+              <input
+                type="tel"
+                value={form.whatsapp_number ?? ''}
+                onChange={(event) => setForm((f) => ({ ...f, whatsapp_number: event.target.value }))}
+              />
+            </label>
             <div className="modal-actions">
               <button type="button" className="secondary" onClick={closeForm} disabled={isSubmitting}>
                 Cancel

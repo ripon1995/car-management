@@ -137,23 +137,25 @@ function CarOwnersPage() {
             onSubmit={handleSubmit}
           >
             <h2 id="car-owner-form-title">{editingId ? 'Edit car owner' : 'New car owner'}</h2>
-            <input
-              ref={nameInputRef}
-              type="text"
-              placeholder="Name"
-              aria-label="Name"
-              value={form.name}
-              onChange={(event) => setForm((f) => ({ ...f, name: event.target.value }))}
-              required
-            />
-            <input
-              type="tel"
-              placeholder="Phone number"
-              aria-label="Phone number"
-              value={form.phone_number}
-              onChange={(event) => setForm((f) => ({ ...f, phone_number: event.target.value }))}
-              required
-            />
+            <label className="form-field">
+              <span className="form-field-label">Name</span>
+              <input
+                ref={nameInputRef}
+                type="text"
+                value={form.name}
+                onChange={(event) => setForm((f) => ({ ...f, name: event.target.value }))}
+                required
+              />
+            </label>
+            <label className="form-field">
+              <span className="form-field-label">Phone number</span>
+              <input
+                type="tel"
+                value={form.phone_number}
+                onChange={(event) => setForm((f) => ({ ...f, phone_number: event.target.value }))}
+                required
+              />
+            </label>
             <div className="modal-actions">
               <button type="button" className="secondary" onClick={closeForm} disabled={isSubmitting}>
                 Cancel

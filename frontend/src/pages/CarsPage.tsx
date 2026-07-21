@@ -191,104 +191,117 @@ function CarsPage() {
             onSubmit={handleSubmit}
           >
             <h2 id="car-form-title">{editingId ? 'Edit car' : 'New car'}</h2>
-            <input
-              ref={brandInputRef}
-              type="text"
-              placeholder="Brand"
-              aria-label="Brand"
-              value={form.brand}
-              onChange={(event) => setForm((f) => ({ ...f, brand: event.target.value }))}
-              required
-            />
-            <input
-              type="text"
-              placeholder="Model (optional)"
-              aria-label="Model"
-              value={form.model_name ?? ''}
-              onChange={(event) => setForm((f) => ({ ...f, model_name: event.target.value }))}
-            />
-            <input
-              type="number"
-              min="1980"
-              max={currentYear + 1}
-              placeholder="Model year"
-              aria-label="Model year"
-              value={form.model_year}
-              onChange={(event) => setForm((f) => ({ ...f, model_year: Number(event.target.value) }))}
-              required
-            />
-            <input
-              type="text"
-              placeholder="Registration number (optional)"
-              aria-label="Registration number"
-              value={form.registration_number ?? ''}
-              onChange={(event) =>
-                setForm((f) => ({ ...f, registration_number: event.target.value }))
-              }
-            />
-            <input
-              type="text"
-              placeholder="Engine number"
-              aria-label="Engine number"
-              value={form.engine_number}
-              onChange={(event) => setForm((f) => ({ ...f, engine_number: event.target.value }))}
-              required
-            />
-            <input
-              type="text"
-              placeholder="Chassis number"
-              aria-label="Chassis number"
-              value={form.chassis_number}
-              onChange={(event) => setForm((f) => ({ ...f, chassis_number: event.target.value }))}
-              required
-            />
-            <input
-              type="text"
-              placeholder="Tyre size"
-              aria-label="Tyre size"
-              value={form.tyre_size}
-              onChange={(event) => setForm((f) => ({ ...f, tyre_size: event.target.value }))}
-              required
-            />
-            <select
-              aria-label="Owner"
-              value={form.owner_id}
-              onChange={(event) => setForm((f) => ({ ...f, owner_id: event.target.value }))}
-              required
-            >
-              <option value="" disabled>
-                Select owner
-              </option>
-              {owners.map((owner) => (
-                <option key={owner.id} value={owner.id}>
-                  {owner.name}
+            <label className="form-field">
+              <span className="form-field-label">Brand</span>
+              <input
+                ref={brandInputRef}
+                type="text"
+                value={form.brand}
+                onChange={(event) => setForm((f) => ({ ...f, brand: event.target.value }))}
+                required
+              />
+            </label>
+            <label className="form-field">
+              <span className="form-field-label">Model (optional)</span>
+              <input
+                type="text"
+                value={form.model_name ?? ''}
+                onChange={(event) => setForm((f) => ({ ...f, model_name: event.target.value }))}
+              />
+            </label>
+            <label className="form-field">
+              <span className="form-field-label">Model year</span>
+              <input
+                type="number"
+                min="1980"
+                max={currentYear + 1}
+                value={form.model_year}
+                onChange={(event) => setForm((f) => ({ ...f, model_year: Number(event.target.value) }))}
+                required
+              />
+            </label>
+            <label className="form-field">
+              <span className="form-field-label">Registration number (optional)</span>
+              <input
+                type="text"
+                value={form.registration_number ?? ''}
+                onChange={(event) =>
+                  setForm((f) => ({ ...f, registration_number: event.target.value }))
+                }
+              />
+            </label>
+            <label className="form-field">
+              <span className="form-field-label">Engine number</span>
+              <input
+                type="text"
+                value={form.engine_number}
+                onChange={(event) => setForm((f) => ({ ...f, engine_number: event.target.value }))}
+                required
+              />
+            </label>
+            <label className="form-field">
+              <span className="form-field-label">Chassis number</span>
+              <input
+                type="text"
+                value={form.chassis_number}
+                onChange={(event) => setForm((f) => ({ ...f, chassis_number: event.target.value }))}
+                required
+              />
+            </label>
+            <label className="form-field">
+              <span className="form-field-label">Tyre size</span>
+              <input
+                type="text"
+                value={form.tyre_size}
+                onChange={(event) => setForm((f) => ({ ...f, tyre_size: event.target.value }))}
+                required
+              />
+            </label>
+            <label className="form-field">
+              <span className="form-field-label">Owner</span>
+              <select
+                value={form.owner_id}
+                onChange={(event) => setForm((f) => ({ ...f, owner_id: event.target.value }))}
+                required
+              >
+                <option value="" disabled>
+                  Select owner
                 </option>
-              ))}
-            </select>
-            <select
-              aria-label="Vendor"
-              value={form.vendor_id ?? ''}
-              onChange={(event) => setForm((f) => ({ ...f, vendor_id: event.target.value }))}
-            >
-              <option value="">Unassigned</option>
-              {vendors.map((vendor) => (
-                <option key={vendor.id} value={vendor.id}>
-                  {vendor.name}
-                </option>
-              ))}
-            </select>
-            <select
-              aria-label="Driver"
-              value={form.driver_id ?? ''}
-              onChange={(event) => setForm((f) => ({ ...f, driver_id: event.target.value }))}
-            >
-              <option value="">Unassigned</option>
-              {drivers.map((driver) => (
-                <option key={driver.id} value={driver.id}>
-                  {driver.name}
-                </option>
-              ))}
-            </select>
+                {owners.map((owner) => (
+                  <option key={owner.id} value={owner.id}>
+                    {owner.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="form-field">
+              <span className="form-field-label">Vendor (optional)</span>
+              <select
+                value={form.vendor_id ?? ''}
+                onChange={(event) => setForm((f) => ({ ...f, vendor_id: event.target.value }))}
+              >
+                <option value="">Unassigned</option>
+                {vendors.map((vendor) => (
+                  <option key={vendor.id} value={vendor.id}>
+                    {vendor.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="form-field">
+              <span className="form-field-label">Driver (optional)</span>
+              <select
+                value={form.driver_id ?? ''}
+                onChange={(event) => setForm((f) => ({ ...f, driver_id: event.target.value }))}
+              >
+                <option value="">Unassigned</option>
+                {drivers.map((driver) => (
+                  <option key={driver.id} value={driver.id}>
+                    {driver.name}
+                  </option>
+                ))}
+              </select>
+            </label>
             <div className="modal-actions">
               <button type="button" className="secondary" onClick={closeForm} disabled={isSubmitting}>
                 Cancel

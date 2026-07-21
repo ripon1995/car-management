@@ -232,6 +232,31 @@
   color: var(--text);
 }
 
+/* Every create/edit modal field: a visible label on the left, the
+   input/select/textarea on the right — replaces relying on placeholder
+   text alone, which reads as unlabeled once a value (e.g. a number
+   default, a selected option) fills the field. The wrapping `<label>`
+   gives the control its accessible name too, so no separate aria-label
+   is needed. */
+.form-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.form-field-label {
+  flex: 0 0 160px;
+  padding-top: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.form-field > *:last-child {
+  flex: 1;
+  min-width: 0;
+}
+
 .modal-actions {
   display: flex;
   justify-content: space-between;

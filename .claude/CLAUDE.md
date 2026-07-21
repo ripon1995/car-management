@@ -337,13 +337,26 @@ create button, since there's nothing to create.
   `onClick={(e) => e.stopPropagation()}` so backdrop clicks don't bubble
   into the panel). Escape key and backdrop click both close it; the first
   field autofocuses on open for create/edit (see `CarOwnersPage.tsx`'s
-  `nameInputRef` + the `isFormOpen` effect). Inputs use `placeholder` text
-  as the visible hint instead of a `<label>`, with `aria-label` carrying
-  the same text for accessibility — no visible `<label>` elements in these
-  modals (contrast `AuthForm.css`'s login/register forms, which predate
-  this convention and do use visible labels; don't backport this modal
-  style onto those two pages without being asked). Footer actions use the
-  shared `.modal-actions` class (`justify-content: space-between`):
+  `nameInputRef` + the `isFormOpen` effect). Every field is wrapped in a
+  `<label className="form-field">` containing a
+  `<span className="form-field-label">` (the field's name, e.g. `Owner`,
+  plus `(optional)` appended for non-required fields) followed by the
+  input/select/textarea — a visible label on the left, the control on the
+  right (shared `.form-field`/`.form-field-label` classes in `App.css`).
+  Wrapping the control in `<label>` gives it its accessible name natively,
+  so no separate `aria-label` is needed. `placeholder` is reserved for a
+  format example on top of the label (e.g. `e.g. 1500.00` on a cost/amount
+  field), not as a stand-in for the label itself — don't go back to
+  placeholder-only fields with no visible label (that read as ambiguous
+  once a select showed "Unassigned" or a number field showed a filled-in
+  default with nothing beside it explaining what it was; fixed across
+  every feature's create/edit modal in one pass, user's explicit call).
+  `AuthForm.css`'s login/register forms predate this convention and use
+  their own visible-label markup; don't backport this exact `.form-field`
+  structure onto those two pages without being asked, but they already
+  satisfy the same "field must have a visible label" intent. Footer
+  actions use the shared `.modal-actions` class
+  (`justify-content: space-between`):
   **Cancel/Close bottom-left**, primary action (`.btn-primary`)
   **bottom-right**. A read-only "view" modal (opened from the table's
   `ViewIcon`) reuses the same `.modal-backdrop`/`.modal-panel.card` shell

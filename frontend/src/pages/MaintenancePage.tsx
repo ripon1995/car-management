@@ -176,70 +176,79 @@ function MaintenancePage() {
             onSubmit={handleSubmit}
           >
             <h2 id="maintenance-form-title">{editingId ? 'Edit record' : 'New record'}</h2>
-            <select
-              ref={typeSelectRef}
-              aria-label="Type"
-              value={form.type}
-              onChange={(event) =>
-                setForm((f) => ({ ...f, type: event.target.value as MaintenanceInput['type'] }))
-              }
-              required
-            >
-              {MAINTENANCE_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {typeLabels[type]}
+            <label className="form-field">
+              <span className="form-field-label">Type</span>
+              <select
+                ref={typeSelectRef}
+                value={form.type}
+                onChange={(event) =>
+                  setForm((f) => ({ ...f, type: event.target.value as MaintenanceInput['type'] }))
+                }
+                required
+              >
+                {MAINTENANCE_TYPES.map((type) => (
+                  <option key={type} value={type}>
+                    {typeLabels[type]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="form-field">
+              <span className="form-field-label">Cost</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="e.g. 1500.00"
+                value={form.cost === 0 ? '' : form.cost}
+                onChange={(event) =>
+                  setForm((f) => ({ ...f, cost: event.target.value === '' ? 0 : Number(event.target.value) }))
+                }
+                required
+              />
+            </label>
+            <label className="form-field">
+              <span className="form-field-label">Service place</span>
+              <input
+                type="text"
+                value={form.service_place}
+                onChange={(event) => setForm((f) => ({ ...f, service_place: event.target.value }))}
+                required
+              />
+            </label>
+            <label className="form-field">
+              <span className="form-field-label">Service by</span>
+              <input
+                type="text"
+                value={form.service_by}
+                onChange={(event) => setForm((f) => ({ ...f, service_by: event.target.value }))}
+                required
+              />
+            </label>
+            <label className="form-field">
+              <span className="form-field-label">Car</span>
+              <select
+                value={form.car_id}
+                onChange={(event) => setForm((f) => ({ ...f, car_id: event.target.value }))}
+                required
+              >
+                <option value="" disabled>
+                  Select car
                 </option>
-              ))}
-            </select>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="Cost (e.g. 1500.00)"
-              aria-label="Cost"
-              value={form.cost === 0 ? '' : form.cost}
-              onChange={(event) =>
-                setForm((f) => ({ ...f, cost: event.target.value === '' ? 0 : Number(event.target.value) }))
-              }
-              required
-            />
-            <input
-              type="text"
-              placeholder="Service place"
-              aria-label="Service place"
-              value={form.service_place}
-              onChange={(event) => setForm((f) => ({ ...f, service_place: event.target.value }))}
-              required
-            />
-            <input
-              type="text"
-              placeholder="Service by"
-              aria-label="Service by"
-              value={form.service_by}
-              onChange={(event) => setForm((f) => ({ ...f, service_by: event.target.value }))}
-              required
-            />
-            <select
-              aria-label="Car"
-              value={form.car_id}
-              onChange={(event) => setForm((f) => ({ ...f, car_id: event.target.value }))}
-              required
-            >
-              <option value="" disabled>
-                Select car
-              </option>
-              {cars.map((car) => (
-                <option key={car.id} value={car.id}>
-                  {`${car.brand} ${car.model_name ?? ''}`.trim()}
-                </option>
-              ))}
-            </select>
-            <textarea
-              placeholder="Description (optional details about this record)"
-              aria-label="Description"
-              value={form.description ?? ''}
-              onChange={(event) => setForm((f) => ({ ...f, description: event.target.value }))}
-            />
+                {cars.map((car) => (
+                  <option key={car.id} value={car.id}>
+                    {`${car.brand} ${car.model_name ?? ''}`.trim()}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="form-field">
+              <span className="form-field-label">Description (optional)</span>
+              <textarea
+                value={form.description ?? ''}
+                onChange={(event) => setForm((f) => ({ ...f, description: event.target.value }))}
+              />
+            </label>
             <div className="modal-actions">
               <button type="button" className="secondary" onClick={closeForm} disabled={isSubmitting}>
                 Cancel

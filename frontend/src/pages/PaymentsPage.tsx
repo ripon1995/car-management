@@ -234,110 +234,125 @@ function PaymentsPage() {
             onSubmit={handleSubmit}
           >
             <h2 id="payment-form-title">{editingId ? 'Edit payment' : 'New payment'}</h2>
-            <select
-              aria-label="Type"
-              value={form.type}
-              onChange={(event) => handleTypeChange(event.target.value as PaymentInput['type'])}
-              required
-            >
-              {PAYMENT_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {typeLabels[type]}
-                </option>
-              ))}
-            </select>
-            <select
-              aria-label="Car"
-              value={form.car_id}
-              onChange={(event) => setForm((f) => ({ ...f, car_id: event.target.value }))}
-              required
-            >
-              <option value="" disabled>
-                Select car
-              </option>
-              {cars.map((car) => (
-                <option key={car.id} value={car.id}>
-                  {`${car.brand} ${car.model_name ?? ''}`.trim()}
-                </option>
-              ))}
-            </select>
-            {form.type === 'service' && (
+            <label className="form-field">
+              <span className="form-field-label">Type</span>
               <select
-                aria-label="Associated maintenance record"
-                value={form.associated_maintenance ?? ''}
-                onChange={(event) =>
-                  setForm((f) => ({ ...f, associated_maintenance: event.target.value || null }))
-                }
+                value={form.type}
+                onChange={(event) => handleTypeChange(event.target.value as PaymentInput['type'])}
+                required
               >
-                <option value="">No linked maintenance record</option>
-                {maintenanceOptions.map((record) => (
-                  <option key={record.id} value={record.id}>
-                    {maintenanceRecordLabel(record)}
+                {PAYMENT_TYPES.map((type) => (
+                  <option key={type} value={type}>
+                    {typeLabels[type]}
                   </option>
                 ))}
               </select>
+            </label>
+            <label className="form-field">
+              <span className="form-field-label">Car</span>
+              <select
+                value={form.car_id}
+                onChange={(event) => setForm((f) => ({ ...f, car_id: event.target.value }))}
+                required
+              >
+                <option value="" disabled>
+                  Select car
+                </option>
+                {cars.map((car) => (
+                  <option key={car.id} value={car.id}>
+                    {`${car.brand} ${car.model_name ?? ''}`.trim()}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {form.type === 'service' && (
+              <label className="form-field">
+                <span className="form-field-label">Linked maintenance (optional)</span>
+                <select
+                  value={form.associated_maintenance ?? ''}
+                  onChange={(event) =>
+                    setForm((f) => ({ ...f, associated_maintenance: event.target.value || null }))
+                  }
+                >
+                  <option value="">No linked maintenance record</option>
+                  {maintenanceOptions.map((record) => (
+                    <option key={record.id} value={record.id}>
+                      {maintenanceRecordLabel(record)}
+                    </option>
+                  ))}
+                </select>
+              </label>
             )}
             {form.type === 'document' && (
-              <select
-                aria-label="Associated car doc"
-                value={form.associated_cardocs ?? ''}
-                onChange={(event) =>
-                  setForm((f) => ({ ...f, associated_cardocs: event.target.value || null }))
-                }
-              >
-                <option value="">No linked car doc</option>
-                {carDocOptions.map((doc) => (
-                  <option key={doc.id} value={doc.id}>
-                    {carDocRecordLabel(doc)}
-                  </option>
-                ))}
-              </select>
+              <label className="form-field">
+                <span className="form-field-label">Linked car doc (optional)</span>
+                <select
+                  value={form.associated_cardocs ?? ''}
+                  onChange={(event) =>
+                    setForm((f) => ({ ...f, associated_cardocs: event.target.value || null }))
+                  }
+                >
+                  <option value="">No linked car doc</option>
+                  {carDocOptions.map((doc) => (
+                    <option key={doc.id} value={doc.id}>
+                      {carDocRecordLabel(doc)}
+                    </option>
+                  ))}
+                </select>
+              </label>
             )}
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="Amount (e.g. 1500.00)"
-              aria-label="Amount"
-              value={form.amount === 0 ? '' : form.amount}
-              onChange={(event) =>
-                setForm((f) => ({ ...f, amount: event.target.value === '' ? 0 : Number(event.target.value) }))
-              }
-              required
-            />
-            <div className="field-with-hint">
+            <label className="form-field">
+              <span className="form-field-label">Amount</span>
               <input
-                type="date"
-                aria-label="Payment date"
-                value={form.payment_date}
-                onChange={(event) => setForm((f) => ({ ...f, payment_date: event.target.value }))}
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="e.g. 1500.00"
+                value={form.amount === 0 ? '' : form.amount}
+                onChange={(event) =>
+                  setForm((f) => ({ ...f, amount: event.target.value === '' ? 0 : Number(event.target.value) }))
+                }
                 required
               />
-              <span className="field-hint">Date the payment was made — format YYYY-MM-DD</span>
-            </div>
-            <input
-              ref={paidByInputRef}
-              type="text"
-              placeholder="Paid by"
-              aria-label="Paid by"
-              value={form.paid_by}
-              onChange={(event) => setForm((f) => ({ ...f, paid_by: event.target.value }))}
-              required
-            />
-            <input
-              type="text"
-              placeholder="Paid to"
-              aria-label="Paid to"
-              value={form.paid_to}
-              onChange={(event) => setForm((f) => ({ ...f, paid_to: event.target.value }))}
-              required
-            />
-            <textarea
-              placeholder="Description (optional)"
-              aria-label="Description"
-              value={form.description ?? ''}
-              onChange={(event) => setForm((f) => ({ ...f, description: event.target.value }))}
-            />
+            </label>
+            <label className="form-field">
+              <span className="form-field-label">Payment date</span>
+              <div className="field-with-hint">
+                <input
+                  type="date"
+                  value={form.payment_date}
+                  onChange={(event) => setForm((f) => ({ ...f, payment_date: event.target.value }))}
+                  required
+                />
+                <span className="field-hint">Date the payment was made — format YYYY-MM-DD</span>
+              </div>
+            </label>
+            <label className="form-field">
+              <span className="form-field-label">Paid by</span>
+              <input
+                ref={paidByInputRef}
+                type="text"
+                value={form.paid_by}
+                onChange={(event) => setForm((f) => ({ ...f, paid_by: event.target.value }))}
+                required
+              />
+            </label>
+            <label className="form-field">
+              <span className="form-field-label">Paid to</span>
+              <input
+                type="text"
+                value={form.paid_to}
+                onChange={(event) => setForm((f) => ({ ...f, paid_to: event.target.value }))}
+                required
+              />
+            </label>
+            <label className="form-field">
+              <span className="form-field-label">Description (optional)</span>
+              <textarea
+                value={form.description ?? ''}
+                onChange={(event) => setForm((f) => ({ ...f, description: event.target.value }))}
+              />
+            </label>
             <div className="modal-actions">
               <button type="button" className="secondary" onClick={closeForm} disabled={isSubmitting}>
                 Cancel

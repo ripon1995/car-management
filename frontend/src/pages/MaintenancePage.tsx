@@ -4,7 +4,7 @@ import ErrorDialog from '../components/ErrorDialog'
 import { ApiError } from '../errors/api'
 import * as api from '../api'
 import { MAINTENANCE_TYPES, type MaintenanceRecord, type MaintenanceInput } from '../types/maintenance'
-import type { Car } from '../types/car'
+import { carDisplayLabel, type Car } from '../types/car'
 import './MaintenancePage.css'
 
 const typeLabels: Record<string, string> = {
@@ -63,7 +63,7 @@ function MaintenancePage() {
   function carLabel(carId: string) {
     const car = cars.find((c) => c.id === carId)
     if (!car) return '—'
-    return `${car.brand} ${car.model_name ?? ''}`.trim()
+    return carDisplayLabel(car)
   }
 
   function recordLabel(record: MaintenanceRecord) {
@@ -237,7 +237,7 @@ function MaintenancePage() {
                 </option>
                 {cars.map((car) => (
                   <option key={car.id} value={car.id}>
-                    {`${car.brand} ${car.model_name ?? ''}`.trim()}
+                    {carDisplayLabel(car)}
                   </option>
                 ))}
               </select>

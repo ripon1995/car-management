@@ -4,9 +4,10 @@ import ErrorDialog from '../components/ErrorDialog'
 import { ApiError } from '../errors/api'
 import * as api from '../api'
 import { PAYMENT_TYPES, type Payment, type PaymentInput } from '../types/payment'
-import type { Car } from '../types/car'
+import { carDisplayLabel, type Car } from '../types/car'
 import type { MaintenanceRecord } from '../types/maintenance'
 import type { CarDoc } from '../types/carDoc'
+import type { FuelRecord } from '../types/fuel'
 import './PaymentsPage.css'
 
 const todayIso = new Date().toISOString().slice(0, 10)
@@ -15,6 +16,7 @@ const typeLabels: Record<string, string> = {
   monthly_fair: 'Monthly fare',
   service: 'Service',
   document: 'Document',
+  fuel: 'Fuel',
   other: 'Other',
 }
 
@@ -41,10 +43,23 @@ function carDocRecordLabel(doc: CarDoc) {
   return `${docTypeLabels[doc.doc_type]} — ${doc.expiry_date}`
 }
 
+const fuelTypeLabels: Record<string, string> = {
+  octane: 'Octane',
+  petrol: 'Petrol',
+  diesel: 'Diesel',
+  cng: 'CNG',
+  other: 'Other',
+}
+
+function fuelRecordLabel(record: FuelRecord) {
+  return `${fuelTypeLabels[record.fuel_type]} — ${record.fuel_station}`
+}
+
 const emptyForm: PaymentInput = {
   type: 'monthly_fair',
   associated_maintenance: null,
   associated_cardocs: null,
+  associated_fuel: null,
   car_id: '',
   amount: 0,
   payment_date: todayIso,
@@ -62,6 +77,7 @@ function PaymentsPage() {
   const [cars, setCars] = useState<Car[]>([])
   const [maintenanceRecords, setMaintenanceRecords] = useState<MaintenanceRecord[]>([])
   const [carDocs, setCarDocs] = useState<CarDoc[]>([])
+  const [fuelRecords, setFuelRecords] = useState<FuelRecord[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<ApiError | null>(null)
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -74,13 +90,20 @@ function PaymentsPage() {
   useEffect(() => {
     let cancelled = false
     setIsLoading(true)
-    Promise.all([api.listPayments(), api.listCars(), api.listMaintenance(), api.listCarDocs()])
-      .then(([paymentsData, carsData, maintenanceData, carDocsData]) => {
+    Promise.all([
+      api.listPayments(),
+      api.listCars(),
+      api.listMaintenance(),
+      api.listCarDocs(),
+      api.listFuelRecords(),
+    ])
+      .then(([paymentsData, carsData, maintenanceData, carDocsData, fuelData]) => {
         if (cancelled) return
         setPayments(paymentsData)
         setCars(carsData)
         setMaintenanceRecords(maintenanceData)
         setCarDocs(carDocsData)
+        setFuelRecords(fuelData)
       })
       .catch((err) => {
         if (!cancelled) setError(toApiError(err))
@@ -96,7 +119,7 @@ function PaymentsPage() {
   function carLabel(carId: string) {
     const car = cars.find((c) => c.id === carId)
     if (!car) return '—'
-    return `${car.brand} ${car.model_name ?? ''}`.trim()
+    return carDisplayLabel(car)
   }
 
   function maintenanceLabel(id: string | null) {
@@ -109,6 +132,12 @@ function PaymentsPage() {
     if (!id) return '—'
     const doc = carDocs.find((d) => d.id === id)
     return doc ? carDocRecordLabel(doc) : '—'
+  }
+
+  function fuelLabel(id: string | null) {
+    if (!id) return '—'
+    const record = fuelRecords.find((r) => r.id === id)
+    return record ? fuelRecordLabel(record) : '—'
   }
 
   function openCreateForm() {
@@ -124,6 +153,7 @@ function PaymentsPage() {
       type: payment.type,
       associated_maintenance: payment.associated_maintenance,
       associated_cardocs: payment.associated_cardocs,
+      associated_fuel: payment.associated_fuel,
       car_id: payment.car_id,
       amount: payment.amount,
       payment_date: payment.payment_date,
@@ -167,6 +197,7 @@ function PaymentsPage() {
       type,
       associated_maintenance: type === 'service' ? f.associated_maintenance : null,
       associated_cardocs: type === 'document' ? f.associated_cardocs : null,
+      associated_fuel: type === 'fuel' ? f.associated_fuel : null,
     }))
   }
 
@@ -207,6 +238,9 @@ function PaymentsPage() {
     ? maintenanceRecords.filter((record) => record.car_id === form.car_id)
     : maintenanceRecords
   const carDocOptions = form.car_id ? carDocs.filter((doc) => doc.car_id === form.car_id) : carDocs
+  const fuelOptions = form.car_id
+    ? fuelRecords.filter((record) => record.car_id === form.car_id)
+    : fuelRecords
 
   return (
     <main id="content" className="payments-page">
@@ -260,7 +294,7 @@ function PaymentsPage() {
                 </option>
                 {cars.map((car) => (
                   <option key={car.id} value={car.id}>
-                    {`${car.brand} ${car.model_name ?? ''}`.trim()}
+                    {carDisplayLabel(car)}
                   </option>
                 ))}
               </select>
@@ -296,6 +330,24 @@ function PaymentsPage() {
                   {carDocOptions.map((doc) => (
                     <option key={doc.id} value={doc.id}>
                       {carDocRecordLabel(doc)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {form.type === 'fuel' && (
+              <label className="form-field">
+                <span className="form-field-label">Linked fuel record (optional)</span>
+                <select
+                  value={form.associated_fuel ?? ''}
+                  onChange={(event) =>
+                    setForm((f) => ({ ...f, associated_fuel: event.target.value || null }))
+                  }
+                >
+                  <option value="">No linked fuel record</option>
+                  {fuelOptions.map((record) => (
+                    <option key={record.id} value={record.id}>
+                      {fuelRecordLabel(record)}
                     </option>
                   ))}
                 </select>
@@ -394,6 +446,12 @@ function PaymentsPage() {
                 <div>
                   <dt>Linked car doc</dt>
                   <dd>{carDocLabel(viewingPayment.associated_cardocs)}</dd>
+                </div>
+              )}
+              {viewingPayment.type === 'fuel' && (
+                <div>
+                  <dt>Linked fuel record</dt>
+                  <dd>{fuelLabel(viewingPayment.associated_fuel)}</dd>
                 </div>
               )}
               <div>

@@ -26,3 +26,13 @@ export interface CarInput {
   vendor_id?: string | null
   driver_id?: string | null
 }
+
+// Label used everywhere a Car is picked or displayed by another feature
+// (select options, table cells, view modals) — appends the last 4 digits
+// of the registration number so cars sharing a brand/model are still easy
+// to tell apart at a glance.
+export function carDisplayLabel(car: Car): string {
+  const nameLabel = `${car.brand} ${car.model_name ?? ''}`.trim()
+  if (!car.registration_number) return nameLabel
+  return `${nameLabel} (${car.registration_number.slice(-4)})`
+}

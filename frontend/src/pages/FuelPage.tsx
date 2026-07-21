@@ -4,7 +4,7 @@ import ErrorDialog from '../components/ErrorDialog'
 import { ApiError } from '../errors/api'
 import * as api from '../api'
 import { FUEL_TYPES, type FuelRecord, type FuelInput } from '../types/fuel'
-import type { Car } from '../types/car'
+import { carDisplayLabel, type Car } from '../types/car'
 import './FuelPage.css'
 
 const typeLabels: Record<string, string> = {
@@ -65,7 +65,7 @@ function FuelPage() {
   function carLabel(carId: string) {
     const car = cars.find((c) => c.id === carId)
     if (!car) return '—'
-    return `${car.brand} ${car.model_name ?? ''}`.trim()
+    return carDisplayLabel(car)
   }
 
   function recordLabel(record: FuelRecord) {
@@ -273,7 +273,7 @@ function FuelPage() {
                 </option>
                 {cars.map((car) => (
                   <option key={car.id} value={car.id}>
-                    {`${car.brand} ${car.model_name ?? ''}`.trim()}
+                    {carDisplayLabel(car)}
                   </option>
                 ))}
               </select>

@@ -3,9 +3,10 @@ from datetime import date
 from decimal import Decimal
 
 from fastapi import Depends
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import NotFoundException, ValidationException
+from app.core.exceptions import ConflictException, NotFoundException, ValidationException
 from app.db.session import get_db
 from app.features.cars.repository import CarRepository
 from app.features.fuel.models import FuelRecord
@@ -64,6 +65,13 @@ class FuelService:
 
     async def delete(self, fuel_id: uuid.UUID) -> None:
         record = await self.get_by_id(fuel_id)
+        from app.features.payments.models import Payment
+
+        linked_payment = await self.repository.db.scalar(
+            select(Payment.id).where(Payment.associated_fuel == fuel_id).limit(1)
+        )
+        if linked_payment is not None:
+            raise ConflictException("Cannot delete a fuel record that has a linked payment")
         await self.repository.delete(record)
 
     @staticmethod

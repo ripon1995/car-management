@@ -1,4 +1,4 @@
-export const PAYMENT_TYPES = ['monthly_fair', 'service', 'document', 'other'] as const
+export const PAYMENT_TYPES = ['monthly_fair', 'service', 'document', 'fuel', 'other'] as const
 
 export type PaymentType = (typeof PAYMENT_TYPES)[number]
 
@@ -7,6 +7,7 @@ export interface Payment {
   type: PaymentType
   associated_maintenance: string | null
   associated_cardocs: string | null
+  associated_fuel: string | null
   car_id: string
   amount: number
   payment_date: string
@@ -21,6 +22,7 @@ export interface PaymentInput {
   type: PaymentType
   associated_maintenance?: string | null
   associated_cardocs?: string | null
+  associated_fuel?: string | null
   car_id: string
   amount: number
   payment_date: string

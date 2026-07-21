@@ -4,7 +4,7 @@ import ErrorDialog from '../components/ErrorDialog'
 import { ApiError } from '../errors/api'
 import * as api from '../api'
 import { DOC_TYPES, type CarDoc, type CarDocInput } from '../types/carDoc'
-import type { Car } from '../types/car'
+import { carDisplayLabel, type Car } from '../types/car'
 import './CarDocsPage.css'
 
 const todayIso = new Date().toISOString().slice(0, 10)
@@ -62,7 +62,7 @@ function CarDocsPage() {
   function carLabel(carId: string) {
     const car = cars.find((c) => c.id === carId)
     if (!car) return '—'
-    return `${car.brand} ${car.model_name ?? ''}`.trim()
+    return carDisplayLabel(car)
   }
 
   function docLabel(doc: CarDoc) {
@@ -227,7 +227,7 @@ function CarDocsPage() {
                 </option>
                 {cars.map((car) => (
                   <option key={car.id} value={car.id}>
-                    {`${car.brand} ${car.model_name ?? ''}`.trim()}
+                    {carDisplayLabel(car)}
                   </option>
                 ))}
               </select>

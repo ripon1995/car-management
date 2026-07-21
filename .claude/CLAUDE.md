@@ -194,24 +194,33 @@ cross-cutting infrastructure lives outside `app/features/`.
   `created_at`, since cost management over time needs a real transaction
   date, not just row-creation time), and optional `description`. `GET /`
   filters by `car_id`, `fuel_type`, and `date_from`/`date_to` over
-  `fuel_date` (same pattern as Payments). Unlike Maintenance/Car Docs,
-  no other feature has an FK into `fuel_records`, so `FuelService.delete()`
-  has no `ConflictException` check of its own — but `CarService.delete()`
-  still blocks deleting a car with fuel records, same as it does for
-  Maintenance/Car Docs/Payment.
+  `fuel_date` (same pattern as Payments). `FuelService.delete()` blocks
+  with `ConflictException` if a `Payment` row references it via
+  `associated_fuel` (imported inline inside the method, same
+  avoid-a-circular-import reasoning as Maintenance/Car Docs' delete()
+  below) — added once Payments grew an `associated_fuel` FK (see below);
+  `CarService.delete()` also still blocks deleting a car with fuel
+  records, same as it does for Maintenance/Car Docs/Payment.
 - `app/features/payments/` — the money-movement ledger. Required FKs:
   `car_id` → `cars.id`; optional FKs: `associated_maintenance` →
-  `maintenance_records.id`, `associated_cardocs` → `car_docs.id`.
-  `PaymentService` validates `type` (`service`/`document`/`monthly_fair`/
-  `other`), `amount >= 0`, that `associated_maintenance` is only set when
-  `type == "service"` and `associated_cardocs` only when
-  `type == "document"` (`ValidationException`), and that every referenced
-  id actually exists (`NotFoundException`, via `CarRepository`/
-  `MaintenanceRepository`/`CarDocRepository`). **Maintenance/Car Docs do
-  not auto-create a Payment row** — that was flagged as an open question
-  in `05-maintenance.md`/`07-payment.md` and resolved as manual (see
-  "Project state"); don't add auto-creation without re-confirming with the
-  user first. `GET /payments` filters by `car_id`, `type`, and a
+  `maintenance_records.id`, `associated_cardocs` → `car_docs.id`,
+  `associated_fuel` → `fuel_records.id` (added in migration `0012`, after
+  Fuel was already live, mirroring the Maintenance/Car Docs linkage
+  pattern exactly — user's explicit call, see "Project state").
+  `PaymentService` validates `type`
+  (`service`/`document`/`fuel`/`monthly_fair`/`other`), `amount >= 0`,
+  that `associated_maintenance` is only set when `type == "service"`,
+  `associated_cardocs` only when `type == "document"`, and
+  `associated_fuel` only when `type == "fuel"` (`ValidationException`),
+  and that every referenced id actually exists (`NotFoundException`, via
+  `CarRepository`/`MaintenanceRepository`/`CarDocRepository`/
+  `FuelRepository`). **Maintenance/Car Docs/Fuel do not auto-create a
+  Payment row** — flagged as an open question in
+  `05-maintenance.md`/`07-payment.md` and resolved as manual for
+  Maintenance/Car Docs (see "Project state"); Fuel's linkage was added
+  later under the same manual-only rule, re-confirmed with the user
+  rather than assumed. Don't add auto-creation without re-confirming with
+  the user first. `GET /payments` filters by `car_id`, `type`, and a
   `date_from`/`date_to` range over `payment_date`.
 - `app/features/revenue/` — read-only, **no `models.py`/`migration`**:
   `RevenueService.get_summary()` takes the same `car_id`/date-range filters
@@ -223,9 +232,13 @@ cross-cutting infrastructure lives outside `app/features/`.
   filtered (comparing cars only makes sense when not already scoped to
   one). `type == "monthly_fair"` is income; every other type is expense —
   `INCOME_TYPE` constant in `service.py` is the single source of truth for
-  that split, don't duplicate the check. Mounted at `GET /api/v1/revenue`
-  with `from`/`to` query param aliases (`Query(alias="from")` — `from` is
-  a Python keyword) rather than `date_from`/`date_to`, matching the exact
+  that split, don't duplicate the check. This means `fuel`-type Payments
+  count as expense automatically, with no change needed in this file —
+  that's why Fuel cost only affects the Revenue dashboard once a Payment
+  row (optionally linked via `associated_fuel`) is created for it, not
+  directly from `fuel_records`. Mounted at `GET /api/v1/revenue` with
+  `from`/`to` query param aliases (`Query(alias="from")` — `from` is a
+  Python keyword) rather than `date_from`/`date_to`, matching the exact
   param names in `08-revenue.md`.
 - `app/api.py` — thin aggregator that `include_router`s each feature's
   router(s); mounted under `/api/v1` in `app/main.py` (the version prefix
@@ -251,7 +264,11 @@ cross-cutting infrastructure lives outside `app/features/`.
   dependency order: `payments` references both `maintenance_records` and
   `car_docs`); `revenue` has no migration since it has no table. `0011`
   creates `fuel_records` (only FK is `car_id` → `cars.id`, so no
-  dependency ordering concern like `payments` had).
+  dependency ordering concern like `payments` had). `0012` adds
+  `payments.associated_fuel` (nullable FK → `fuel_records.id`) after the
+  fact, once Payments needed to optionally link to Fuel too — a plain
+  `add_column`/`drop_column` pair, not a new table, so it didn't need a
+  new `alembic/env.py` model import.
 
 **Known environment quirk:** this venv is Python 3.14 (very new). Standard
 `passlib[bcrypt]` fails at runtime here (`AttributeError: module 'bcrypt'
@@ -371,7 +388,19 @@ create button, since there's nothing to create.
   list (see `CarsPage.tsx`), use it to populate the `<select>` options in
   the form, and reuse it again to resolve id → name for display in the
   table and view modal (there's no expanded/joined read from the API —
-  `CarRead` only carries the raw FK ids).
+  `CarRead` only carries the raw FK ids). Car specifically is picked by
+  four sibling features (Maintenance, Car Docs, Payments, Fuel), all of
+  which display it via the shared `carDisplayLabel(car)` helper exported
+  from `src/types/car.ts` — brand + model, plus the last 4 digits of
+  `registration_number` in parens when present (e.g. `Toyota Corolla
+  (4321)`), so cars sharing a brand/model are still easy to tell apart in
+  a select or table. This is the one cross-page-shared (not
+  copy-pasted-per-page) display helper in the frontend, since it has 8
+  call sites across 4 files and a single source of truth was worth it;
+  don't reintroduce a local per-page `${car.brand} ${car.model_name ?? ''}`
+  duplicate — import and use `carDisplayLabel` instead. Each of those 4
+  pages' own local `carLabel(carId)` helper still does the `cars.find` id
+  lookup, then delegates formatting to `carDisplayLabel`.
 - `NavIcons.tsx` holds every icon as a small inline-SVG component built
   from the shared `iconProps()` helper (24×24 viewBox, `stroke="currentColor"`,
   `strokeWidth="1.5"`) — add new icons here (e.g. `PlusIcon`) rather than
@@ -380,12 +409,18 @@ create button, since there's nothing to create.
   per-page state — feature pages only hold their own list/form/loading
   state locally with `useState`, matching `CarOwnersPage.tsx`.
 - `PaymentsPage.tsx`'s form conditionally renders the `associated_maintenance`
-  select only when `type === 'service'` and `associated_cardocs` only when
-  `type === 'document'` (mirroring the backend's validation), clearing the
-  other one whenever `type` changes; both selects filter their options
-  down to the currently-selected `car_id` when one is chosen. Reuse this
-  conditional-field-by-type pattern for any future feature whose form
-  fields depend on a sibling `type`/enum field.
+  select only when `type === 'service'`, `associated_cardocs` only when
+  `type === 'document'`, and `associated_fuel` only when `type === 'fuel'`
+  (mirroring the backend's validation), clearing the other two whenever
+  `type` changes (`handleTypeChange`); all three selects filter their
+  options down to the currently-selected `car_id` when one is chosen.
+  Reuse this conditional-field-by-type pattern for any future feature
+  whose form fields depend on a sibling `type`/enum field. The page fetches
+  `listFuelRecords()` in the same page-load `Promise.all` as
+  cars/maintenance/car docs, and labels a fuel option via a local
+  `fuelRecordLabel(record)` (`${fuel type label} — ${fuel_station}`,
+  matching `maintenanceRecordLabel`/`carDocRecordLabel`'s
+  one-line-identifying-string shape).
 - `CarDocsPage.tsx` colors an already-past `expiry_date` cell with
   `.expired` (`var(--status-critical)`, defined in the page's own CSS
   file rather than `App.css` since no other feature needs it yet) — a

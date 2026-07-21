@@ -4,13 +4,14 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict
 
-PAYMENT_TYPES = ("service", "document", "monthly_fair", "other")
+PAYMENT_TYPES = ("service", "document", "fuel", "monthly_fair", "other")
 
 
 class PaymentCreate(BaseModel):
     type: str
     associated_maintenance: uuid.UUID | None = None
     associated_cardocs: uuid.UUID | None = None
+    associated_fuel: uuid.UUID | None = None
     car_id: uuid.UUID
     amount: Decimal
     payment_date: date
@@ -23,6 +24,7 @@ class PaymentUpdate(BaseModel):
     type: str | None = None
     associated_maintenance: uuid.UUID | None = None
     associated_cardocs: uuid.UUID | None = None
+    associated_fuel: uuid.UUID | None = None
     car_id: uuid.UUID | None = None
     amount: Decimal | None = None
     payment_date: date | None = None
@@ -38,6 +40,7 @@ class PaymentRead(BaseModel):
     type: str
     associated_maintenance: uuid.UUID | None
     associated_cardocs: uuid.UUID | None
+    associated_fuel: uuid.UUID | None
     car_id: uuid.UUID
     amount: Decimal
     payment_date: date

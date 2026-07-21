@@ -1,0 +1,422 @@
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { FuelIcon, PlusIcon, ViewIcon, EditIcon, DeleteIcon } from '../components/NavIcons'
+import ErrorDialog from '../components/ErrorDialog'
+import { ApiError } from '../errors/api'
+import * as api from '../api'
+import { FUEL_TYPES, type FuelRecord, type FuelInput } from '../types/fuel'
+import type { Car } from '../types/car'
+import './FuelPage.css'
+
+const typeLabels: Record<string, string> = {
+  octane: 'Octane',
+  petrol: 'Petrol',
+  diesel: 'Diesel',
+  cng: 'CNG',
+  other: 'Other',
+}
+
+const emptyForm: FuelInput = {
+  fuel_type: 'octane',
+  quantity_liters: 0,
+  cost: 0,
+  odometer_reading: null,
+  fuel_station: '',
+  fuel_date: '',
+  description: '',
+  car_id: '',
+}
+
+function toApiError(err: unknown): ApiError {
+  return err instanceof ApiError ? err : new ApiError(0, 'Something went wrong', 'Something went wrong')
+}
+
+function FuelPage() {
+  const [records, setRecords] = useState<FuelRecord[]>([])
+  const [cars, setCars] = useState<Car[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<ApiError | null>(null)
+  const [isFormOpen, setIsFormOpen] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [form, setForm] = useState<FuelInput>(emptyForm)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [viewingRecord, setViewingRecord] = useState<FuelRecord | null>(null)
+  const typeSelectRef = useRef<HTMLSelectElement>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    setIsLoading(true)
+    Promise.all([api.listFuelRecords(), api.listCars()])
+      .then(([recordsData, carsData]) => {
+        if (cancelled) return
+        setRecords(recordsData)
+        setCars(carsData)
+      })
+      .catch((err) => {
+        if (!cancelled) setError(toApiError(err))
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  function carLabel(carId: string) {
+    const car = cars.find((c) => c.id === carId)
+    if (!car) return '—'
+    return `${car.brand} ${car.model_name ?? ''}`.trim()
+  }
+
+  function recordLabel(record: FuelRecord) {
+    return `${typeLabels[record.fuel_type]} — ${carLabel(record.car_id)}`
+  }
+
+  function openCreateForm() {
+    setEditingId(null)
+    setForm(emptyForm)
+    setIsFormOpen(true)
+  }
+
+  function openEditForm(record: FuelRecord) {
+    setViewingRecord(null)
+    setEditingId(record.id)
+    setForm({
+      fuel_type: record.fuel_type,
+      quantity_liters: record.quantity_liters,
+      cost: record.cost,
+      odometer_reading: record.odometer_reading,
+      fuel_station: record.fuel_station,
+      fuel_date: record.fuel_date,
+      description: record.description ?? '',
+      car_id: record.car_id,
+    })
+    setIsFormOpen(true)
+  }
+
+  function closeForm() {
+    setIsFormOpen(false)
+    setEditingId(null)
+    setForm(emptyForm)
+  }
+
+  useEffect(() => {
+    if (!isFormOpen) return
+    typeSelectRef.current?.focus()
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') closeForm()
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [isFormOpen])
+
+  useEffect(() => {
+    if (!viewingRecord) return
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') setViewingRecord(null)
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [viewingRecord])
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault()
+    setIsSubmitting(true)
+    const payload: FuelInput = {
+      ...form,
+      odometer_reading: form.odometer_reading || null,
+      description: form.description || null,
+    }
+    try {
+      if (editingId) {
+        const updated = await api.updateFuelRecord(editingId, payload)
+        setRecords((prev) => prev.map((record) => (record.id === editingId ? updated : record)))
+      } else {
+        const created = await api.createFuelRecord(payload)
+        setRecords((prev) => [...prev, created])
+      }
+      closeForm()
+    } catch (err) {
+      setError(toApiError(err))
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  async function handleDelete(record: FuelRecord) {
+    if (!window.confirm(`Delete this ${recordLabel(record)} fuel record?`)) return
+    try {
+      await api.deleteFuelRecord(record.id)
+      setRecords((prev) => prev.filter((existing) => existing.id !== record.id))
+    } catch (err) {
+      setError(toApiError(err))
+    }
+  }
+
+  return (
+    <main id="content" className="fuel-page">
+      <div className="page-header">
+        <h1 className="page-title">
+          <span className="app-nav-icon">
+            <FuelIcon />
+          </span>
+          Fuel
+        </h1>
+        <button type="button" className="btn-primary" onClick={openCreateForm}>
+          <PlusIcon />
+          Add record
+        </button>
+      </div>
+
+      {isFormOpen && (
+        <div className="modal-backdrop" onClick={closeForm}>
+          <form
+            className="modal-panel card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="fuel-form-title"
+            onClick={(event) => event.stopPropagation()}
+            onSubmit={handleSubmit}
+          >
+            <h2 id="fuel-form-title">{editingId ? 'Edit record' : 'New record'}</h2>
+            <select
+              ref={typeSelectRef}
+              aria-label="Fuel type"
+              value={form.fuel_type}
+              onChange={(event) =>
+                setForm((f) => ({ ...f, fuel_type: event.target.value as FuelInput['fuel_type'] }))
+              }
+              required
+            >
+              {FUEL_TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {typeLabels[type]}
+                </option>
+              ))}
+            </select>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="Quantity (liters)"
+              aria-label="Quantity (liters)"
+              value={form.quantity_liters === 0 ? '' : form.quantity_liters}
+              onChange={(event) =>
+                setForm((f) => ({
+                  ...f,
+                  quantity_liters: event.target.value === '' ? 0 : Number(event.target.value),
+                }))
+              }
+              required
+            />
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="Cost (e.g. 1500.00)"
+              aria-label="Cost"
+              value={form.cost === 0 ? '' : form.cost}
+              onChange={(event) =>
+                setForm((f) => ({ ...f, cost: event.target.value === '' ? 0 : Number(event.target.value) }))
+              }
+              required
+            />
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="Odometer reading (optional)"
+              aria-label="Odometer reading"
+              value={form.odometer_reading ?? ''}
+              onChange={(event) =>
+                setForm((f) => ({
+                  ...f,
+                  odometer_reading: event.target.value === '' ? null : Number(event.target.value),
+                }))
+              }
+            />
+            <input
+              type="text"
+              placeholder="Fuel station"
+              aria-label="Fuel station"
+              value={form.fuel_station}
+              onChange={(event) => setForm((f) => ({ ...f, fuel_station: event.target.value }))}
+              required
+            />
+            <input
+              type="date"
+              aria-label="Fuel date"
+              value={form.fuel_date}
+              onChange={(event) => setForm((f) => ({ ...f, fuel_date: event.target.value }))}
+              required
+            />
+            <select
+              aria-label="Car"
+              value={form.car_id}
+              onChange={(event) => setForm((f) => ({ ...f, car_id: event.target.value }))}
+              required
+            >
+              <option value="" disabled>
+                Select car
+              </option>
+              {cars.map((car) => (
+                <option key={car.id} value={car.id}>
+                  {`${car.brand} ${car.model_name ?? ''}`.trim()}
+                </option>
+              ))}
+            </select>
+            <textarea
+              placeholder="Description (optional details about this record)"
+              aria-label="Description"
+              value={form.description ?? ''}
+              onChange={(event) => setForm((f) => ({ ...f, description: event.target.value }))}
+            />
+            <div className="modal-actions">
+              <button type="button" className="secondary" onClick={closeForm} disabled={isSubmitting}>
+                Cancel
+              </button>
+              <button type="submit" className="btn-primary" disabled={isSubmitting}>
+                {isSubmitting ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {viewingRecord && (
+        <div className="modal-backdrop" onClick={() => setViewingRecord(null)}>
+          <div
+            className="modal-panel card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="fuel-view-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="fuel-view-title">{recordLabel(viewingRecord)}</h2>
+            <dl className="detail-list">
+              <div>
+                <dt>Fuel type</dt>
+                <dd>{typeLabels[viewingRecord.fuel_type]}</dd>
+              </div>
+              <div>
+                <dt>Quantity (liters)</dt>
+                <dd>{viewingRecord.quantity_liters}</dd>
+              </div>
+              <div>
+                <dt>Cost</dt>
+                <dd>{viewingRecord.cost}</dd>
+              </div>
+              <div>
+                <dt>Odometer reading</dt>
+                <dd>{viewingRecord.odometer_reading ?? '—'}</dd>
+              </div>
+              <div>
+                <dt>Fuel station</dt>
+                <dd>{viewingRecord.fuel_station}</dd>
+              </div>
+              <div>
+                <dt>Fuel date</dt>
+                <dd>{viewingRecord.fuel_date}</dd>
+              </div>
+              <div>
+                <dt>Description</dt>
+                <dd>{viewingRecord.description ?? '—'}</dd>
+              </div>
+              <div>
+                <dt>Car</dt>
+                <dd>{carLabel(viewingRecord.car_id)}</dd>
+              </div>
+              <div>
+                <dt>Created</dt>
+                <dd>{new Date(viewingRecord.created_at).toLocaleString()}</dd>
+              </div>
+              <div>
+                <dt>Last updated</dt>
+                <dd>{new Date(viewingRecord.updated_at).toLocaleString()}</dd>
+              </div>
+            </dl>
+            <div className="modal-actions">
+              <button type="button" className="secondary" onClick={() => setViewingRecord(null)}>
+                Close
+              </button>
+              <button type="button" className="btn-primary" onClick={() => openEditForm(viewingRecord)}>
+                Edit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isLoading ? (
+        <p>Loading…</p>
+      ) : records.length === 0 ? (
+        <p>No fuel records yet.</p>
+      ) : (
+        <div className="data-table-wrap card">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>SL</th>
+                <th>Fuel type</th>
+                <th>Quantity (L)</th>
+                <th>Cost</th>
+                <th>Fuel station</th>
+                <th>Fuel date</th>
+                <th>Car</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {records.map((record, index) => (
+                <tr key={record.id}>
+                  <td>{index + 1}</td>
+                  <td>{typeLabels[record.fuel_type]}</td>
+                  <td>{record.quantity_liters}</td>
+                  <td>{record.cost}</td>
+                  <td>{record.fuel_station}</td>
+                  <td>{record.fuel_date}</td>
+                  <td>{carLabel(record.car_id)}</td>
+                  <td className="data-table-actions">
+                    <button
+                      type="button"
+                      className="icon-btn"
+                      aria-label={`View ${recordLabel(record)}`}
+                      title="View"
+                      onClick={() => setViewingRecord(record)}
+                    >
+                      <ViewIcon />
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-btn"
+                      aria-label={`Edit ${recordLabel(record)}`}
+                      title="Edit"
+                      onClick={() => openEditForm(record)}
+                    >
+                      <EditIcon />
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-btn danger"
+                      aria-label={`Delete ${recordLabel(record)}`}
+                      title="Delete"
+                      onClick={() => handleDelete(record)}
+                    >
+                      <DeleteIcon />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <ErrorDialog error={error} onClose={() => setError(null)} />
+    </main>
+  )
+}
+
+export default FuelPage

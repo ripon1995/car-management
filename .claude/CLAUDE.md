@@ -18,6 +18,15 @@ manually/independently on the Payments page (matches the plain-CRUD
 pattern of every other feature; user's explicit call, don't revisit
 without asking).
 
+A 9th feature, **Fuel**, was added after the original 8 (no feature doc —
+built directly off user instruction, following the same
+repository/service/router + page/api/types pattern as every other
+feature). See "Backend architecture"/"Frontend architecture" below for its
+shape; every field beyond `car_id`/`cost` is an **(added)**/**(assumption)**
+choice made to satisfy the user's stated purpose ("track fuel consumption"
++ "cost management"), not from a written spec — worth confirming with the
+user before extending it further.
+
 **No unit tests in this project by explicit user instruction** — don't add
 a test suite unless asked.
 
@@ -172,6 +181,24 @@ cross-cutting infrastructure lives outside `app/features/`.
   the method, not at module level, to avoid a circular import with
   `app.features.payments.service` which imports these two features'
   repositories).
+- `app/features/fuel/` — the 9th feature (see "Project state"), car-scoped
+  like Maintenance/Car Docs: required FK `car_id` → `cars.id` validated via
+  `CarRepository`. Fields beyond `car_id` are all **(added)**: `fuel_type`
+  (fixed tuple `octane`/`petrol`/`diesel`/`cng`/`other`, validated like
+  Maintenance's `type`), `quantity_liters` (`>= 0`, the consumption-tracking
+  half of the feature), `cost` (`>= 0`, the cost-management half),
+  `odometer_reading` (optional, `>= 0` when present — not used for any
+  computed mileage/efficiency yet, just stored for a future consumption-rate
+  feature), `fuel_station`, `fuel_date` (required `date`, mirroring
+  Payment's `payment_date` rather than Maintenance's plain
+  `created_at`, since cost management over time needs a real transaction
+  date, not just row-creation time), and optional `description`. `GET /`
+  filters by `car_id`, `fuel_type`, and `date_from`/`date_to` over
+  `fuel_date` (same pattern as Payments). Unlike Maintenance/Car Docs,
+  no other feature has an FK into `fuel_records`, so `FuelService.delete()`
+  has no `ConflictException` check of its own — but `CarService.delete()`
+  still blocks deleting a car with fuel records, same as it does for
+  Maintenance/Car Docs/Payment.
 - `app/features/payments/` — the money-movement ledger. Required FKs:
   `car_id` → `cars.id`; optional FKs: `associated_maintenance` →
   `maintenance_records.id`, `associated_cardocs` → `car_docs.id`.
@@ -216,12 +243,15 @@ cross-cutting infrastructure lives outside `app/features/`.
   `app.features.auth.models`, `app.features.car_owners.models`,
   `app.features.vendors.models`, `app.features.drivers.models`,
   `app.features.cars.models`, `app.features.maintenance.models`,
-  `app.features.car_docs.models`, `app.features.payments.models`) so its
-  tables register on `Base.metadata` before migrations run — add the new
-  import there too when adding a feature. Migrations `0006`–`0008` create
+  `app.features.car_docs.models`, `app.features.payments.models`,
+  `app.features.fuel.models`) so its tables register on `Base.metadata`
+  before migrations run — add the new import there too when adding a
+  feature. Migrations `0006`–`0008` create
   `maintenance_records`/`car_docs`/`payments` in that order (FK
   dependency order: `payments` references both `maintenance_records` and
-  `car_docs`); `revenue` has no migration since it has no table.
+  `car_docs`); `revenue` has no migration since it has no table. `0011`
+  creates `fuel_records` (only FK is `car_id` → `cars.id`, so no
+  dependency ordering concern like `payments` had).
 
 **Known environment quirk:** this venv is Python 3.14 (very new). Standard
 `passlib[bcrypt]` fails at runtime here (`AttributeError: module 'bcrypt'
@@ -241,9 +271,12 @@ business entity gets a page, an API module, and (if it needs more than
 primitive fields) a types file. `app/features/car_owners/` on the backend
 maps to `src/pages/CarOwnersPage.tsx` + `src/api/carOwners.ts` +
 `src/types/carOwner.ts` on the frontend; `vendors`/`drivers`/`cars`/
-`maintenance`/`car_docs`/`payments` all follow the same layout
+`maintenance`/`car_docs`/`payments`/`fuel` all follow the same layout
 (`VendorsPage.tsx`/`DriversPage.tsx`/`CarsPage.tsx`/`MaintenancePage.tsx`/
-`CarDocsPage.tsx`/`PaymentsPage.tsx` + matching `api/`/`types/` modules).
+`CarDocsPage.tsx`/`PaymentsPage.tsx`/`FuelPage.tsx` + matching `api/`/`types/`
+modules); `FuelPage.tsx` at `/fuel` (nav entry between Maintenance and Car
+Docs) is copied directly from `MaintenancePage.tsx`'s
+modal-form/data-table/view-modal structure.
 Revenue is the one exception, since it's a read-only dashboard rather than
 a CRUD resource: it's `src/pages/DashboardPage.tsx` (mounted at the
 existing `/dashboard` route/nav entry, not a new `/revenue` route) +

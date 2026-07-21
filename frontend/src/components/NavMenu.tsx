@@ -5,6 +5,7 @@ import {
   CarsIcon,
   DashboardIcon,
   DriversIcon,
+  FuelIcon,
   MaintenanceIcon,
   PaymentsIcon,
   VendorsIcon,
@@ -18,6 +19,7 @@ const links = [
   { to: '/vendors', label: 'Vendors', Icon: VendorsIcon },
   { to: '/drivers', label: 'Drivers', Icon: DriversIcon },
   { to: '/maintenance', label: 'Maintenance', Icon: MaintenanceIcon },
+  { to: '/fuel', label: 'Fuel', Icon: FuelIcon },
   { to: '/car-docs', label: 'Car Docs', Icon: CarDocsIcon },
   { to: '/payments', label: 'Payments', Icon: PaymentsIcon },
 ]

@@ -11,6 +11,7 @@ import CarsPage from './pages/CarsPage'
 import VendorsPage from './pages/VendorsPage'
 import DriversPage from './pages/DriversPage'
 import MaintenancePage from './pages/MaintenancePage'
+import FuelPage from './pages/FuelPage'
 import CarDocsPage from './pages/CarDocsPage'
 import PaymentsPage from './pages/PaymentsPage'
 import ProfilePage from './pages/ProfilePage'
@@ -77,6 +78,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <MaintenancePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/fuel"
+              element={
+                <ProtectedRoute>
+                  <FuelPage />
                 </ProtectedRoute>
               }
             />

@@ -92,6 +92,29 @@ export function MaintenanceIcon() {
   )
 }
 
+export function FuelIcon() {
+  return (
+    <svg {...iconProps()}>
+      <path
+        d="M4 20V6a1.5 1.5 0 0 1 1.5-1.5h6A1.5 1.5 0 0 1 13 6v14"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M4 20h9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M6.5 11h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path
+        d="M13 9.5h1.8L17 11.7V17a1.2 1.2 0 0 0 2.4 0v-4.3a2 2 0 0 0-.6-1.4L17 9.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
 export function CarDocsIcon() {
   return (
     <svg {...iconProps()}>

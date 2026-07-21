@@ -77,6 +77,7 @@ class CarService:
 
     async def _check_not_referenced(self, car_id: uuid.UUID) -> None:
         from app.features.car_docs.models import CarDoc
+        from app.features.fuel.models import FuelRecord
         from app.features.maintenance.models import MaintenanceRecord
         from app.features.payments.models import Payment
 
@@ -84,6 +85,7 @@ class CarService:
             (MaintenanceRecord, "maintenance records"),
             (CarDoc, "car docs"),
             (Payment, "payments"),
+            (FuelRecord, "fuel records"),
         ):
             referenced = await self.repository.db.scalar(
                 select(model.id).where(model.car_id == car_id).limit(1)

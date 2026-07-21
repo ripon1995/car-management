@@ -38,7 +38,6 @@ class PaymentService:
 
     async def create(self, payload: PaymentCreate) -> Payment:
         self._validate_type(payload.type)
-        self._validate_amount(payload.amount)
         self._validate_associations(
             payload.type,
             payload.associated_maintenance,
@@ -53,7 +52,13 @@ class PaymentService:
             payload.associated_fuel,
             payload.associated_enrollment,
         )
-        return await self.repository.create(**payload.model_dump())
+        data = payload.model_dump()
+        if payload.type == "monthly_fair":
+            enrollment = await self.enrollment_repository.get_by_id(payload.associated_enrollment)
+            data["amount"] = enrollment.monthly_fare
+        else:
+            self._validate_amount(payload.amount)
+        return await self.repository.create(**data)
 
     async def list_all(
         self,
@@ -78,8 +83,6 @@ class PaymentService:
 
         if "type" in updates:
             self._validate_type(updates["type"])
-        if "amount" in updates:
-            self._validate_amount(updates["amount"])
 
         association_fields = (
             "type",
@@ -113,6 +116,14 @@ class PaymentService:
                 updates.get("associated_enrollment", payment.associated_enrollment),
             )
 
+        resultant_type = updates.get("type", payment.type)
+        if resultant_type == "monthly_fair":
+            enrollment_id = updates.get("associated_enrollment", payment.associated_enrollment)
+            enrollment = await self.enrollment_repository.get_by_id(enrollment_id)
+            updates["amount"] = enrollment.monthly_fare
+        elif "amount" in updates:
+            self._validate_amount(updates["amount"])
+
         return await self.repository.update(payment, updates)
 
     async def delete(self, payment_id: uuid.UUID) -> None:
@@ -125,8 +136,8 @@ class PaymentService:
             raise ValidationException(f"type must be one of {', '.join(PAYMENT_TYPES)}")
 
     @staticmethod
-    def _validate_amount(amount: Decimal) -> None:
-        if amount < 0:
+    def _validate_amount(amount: Decimal | None) -> None:
+        if amount is None or amount < 0:
             raise ValidationException("amount must be >= 0")
 
     @staticmethod
@@ -145,6 +156,8 @@ class PaymentService:
             raise ValidationException("associated_fuel can only be set when type is 'fuel'")
         if associated_enrollment is not None and type != "monthly_fair":
             raise ValidationException("associated_enrollment can only be set when type is 'monthly_fair'")
+        if associated_enrollment is None and type == "monthly_fair":
+            raise ValidationException("associated_enrollment is required when type is 'monthly_fair'")
 
     async def _validate_references(
         self,

@@ -226,8 +226,13 @@ function PaymentsPage() {
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
     setIsSubmitting(true)
+    const linkedEnrollment =
+      form.type === 'monthly_fair'
+        ? enrollments.find((e) => e.id === form.associated_enrollment)
+        : null
     const payload: PaymentInput = {
       ...form,
+      amount: linkedEnrollment ? linkedEnrollment.monthly_fare : form.amount,
       description: form.description || null,
     }
     try {
@@ -380,14 +385,17 @@ function PaymentsPage() {
             )}
             {form.type === 'monthly_fair' && (
               <label className="form-field">
-                <span className="form-field-label">Linked enrollment (optional)</span>
+                <span className="form-field-label">Linked enrollment</span>
                 <select
                   value={form.associated_enrollment ?? ''}
                   onChange={(event) =>
                     setForm((f) => ({ ...f, associated_enrollment: event.target.value || null }))
                   }
+                  required
                 >
-                  <option value="">No linked enrollment</option>
+                  <option value="" disabled>
+                    Select enrollment
+                  </option>
                   {enrollmentOptions.map((enrollment) => (
                     <option key={enrollment.id} value={enrollment.id}>
                       {enrollmentRecordLabel(enrollment)}
@@ -396,20 +404,25 @@ function PaymentsPage() {
                 </select>
               </label>
             )}
-            <label className="form-field">
-              <span className="form-field-label">Amount</span>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="e.g. 1500.00"
-                value={form.amount === 0 ? '' : form.amount}
-                onChange={(event) =>
-                  setForm((f) => ({ ...f, amount: event.target.value === '' ? 0 : Number(event.target.value) }))
-                }
-                required
-              />
-            </label>
+            {form.type !== 'monthly_fair' && (
+              <label className="form-field">
+                <span className="form-field-label">Amount</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="e.g. 1500.00"
+                  value={form.amount === 0 ? '' : form.amount}
+                  onChange={(event) =>
+                    setForm((f) => ({
+                      ...f,
+                      amount: event.target.value === '' ? 0 : Number(event.target.value),
+                    }))
+                  }
+                  required
+                />
+              </label>
+            )}
             <label className="form-field">
               <span className="form-field-label">Payment date</span>
               <div className="field-with-hint">

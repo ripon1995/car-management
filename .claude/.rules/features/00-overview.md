@@ -5,16 +5,27 @@
 - **Frontend:** React
 
 ## Business Model
-A **Car Owner** owns one or more cars. Each car is leased out to a **Vendor**
-who pays the owner a fixed **monthly fare** to operate the car. A **Driver**
-is assigned to operate the car day-to-day. **Payment** records every money
-movement tied to a car (`monthly_fair` = income, `service` / `document` /
-`other` = expense). **Revenue** is a dashboard-only aggregation (pie + bar
-charts) computed on the fly from Payment records — it has no table of its
-own. **Auth is a separate, generic login identity** (`users` table, custom
-FastAPI JWT, email + password) decoupled from every business entity —
-Car Owners themselves never log in; whoever is authenticated has full CRUD
-power over all resources. See [Auth](09-auth.md).
+A **Car Owner** owns one or more cars. Each car can be leased out to a
+**Vendor** who pays a **monthly fare** to operate it — this is a dated
+lease (an **Enrollment**: which car, which vendor, what fare, since when,
+and optionally until when), not a fixed one-time assignment, since a car
+can be leased, returned, and re-leased (possibly to a different vendor at
+a different fare) over its lifetime, with no fare owed during any gap
+between leases. See [Car CRUD](01-car.md) and [Vendor CRUD](02-vendor.md)
+for the current shape of this relationship (it started as a bare
+current-assignment FK + a fixed vendor-level fare and was reworked into
+Enrollment after launch — see `CLAUDE.md`'s "Project state"). A **Driver**
+is assigned to operate the car day-to-day (still a plain current-assignment
+FK, unlike Vendor). **Payment** records every money movement tied to a car
+(`monthly_fair` = income, `service` / `document` / `fuel` / `other` =
+expense); `monthly_fair` payments must link back to the Enrollment that
+generated them, with the amount always taken from that Enrollment's fare
+rather than entered by hand. **Revenue** is a dashboard-only aggregation
+(pie + bar charts) computed on the fly from Payment records — it has no
+table of its own. **Auth is a separate, generic login identity** (`users`
+table, custom FastAPI JWT, email + password) decoupled from every business
+entity — Car Owners themselves never log in; whoever is authenticated has
+full CRUD power over all resources. See [Auth](09-auth.md).
 
 ## Features
 1. [Car CRUD](01-car.md)

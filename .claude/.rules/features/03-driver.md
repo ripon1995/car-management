@@ -18,8 +18,11 @@ A Driver is the person who operates a Car day-to-day.
 - One Driver ↔ many Cars (`cars.driver_id`), current assignment.
 - **(assumption)** No salary/payroll field was specified for Driver. If the
   owner pays driver salaries (see [Payment](07-payment.md)), a `salary`
-  (numeric) field may belong here, similar to `vendors.monthly_fare`.
-  Not added by default — add if confirmed.
+  (numeric) field may belong here — or, if salary can change over time or
+  driver assignment has its own start/end dates worth tracking, a dated
+  record similar to how [Vendor](02-vendor.md)'s per-car fare is modeled by
+  Enrollment rather than a static field. Not added by default — add if
+  confirmed.
 
 ## API Endpoints
 All endpoints require authentication (see [Auth](09-auth.md)); any

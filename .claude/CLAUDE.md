@@ -255,14 +255,27 @@ cross-cutting infrastructure lives outside `app/features/`.
   pattern exactly — user's explicit call, see "Project state"),
   `associated_enrollment` → `enrollments.id` (added in migration `0016`,
   same pattern again). `PaymentService` validates `type`
-  (`service`/`document`/`fuel`/`monthly_fair`/`other`), `amount >= 0`,
-  that `associated_maintenance` is only set when `type == "service"`,
+  (`service`/`document`/`fuel`/`monthly_fair`/`other`), that
+  `associated_maintenance` is only set when `type == "service"`,
   `associated_cardocs` only when `type == "document"`, `associated_fuel`
-  only when `type == "fuel"`, and `associated_enrollment` only when `type
-  == "monthly_fair"` (`ValidationException`), and that every referenced id
-  actually exists (`NotFoundException`, via
+  only when `type == "fuel"` (all three optional even for their matching
+  type — a payment may exist without a formal linked record), and that
+  every referenced id actually exists (`NotFoundException`, via
   `CarRepository`/`MaintenanceRepository`/`CarDocRepository`/
-  `FuelRepository`/`EnrollmentRepository`). **Maintenance/Car Docs/Fuel do
+  `FuelRepository`/`EnrollmentRepository`). `associated_enrollment` is
+  different: it's **required, not optional, whenever `type ==
+  "monthly_fair"`** (`ValidationException` if missing — user's explicit
+  call, a `monthly_fair` payment must always trace back to a real lease
+  period), and when it's set, `amount` is **not** taken from the request at
+  all — `PaymentService.create()`/`update()` silently overwrite `amount`
+  with that Enrollment's `monthly_fare` every time (looked up via
+  `EnrollmentRepository`), so a `monthly_fair` payment's amount can never
+  drift from its linked enrollment's rate; `amount` stays a manually-entered
+  required field (validated `>= 0`) only for the other four types. This
+  mirrors `EnrollmentService.generate_due_payments()`'s existing
+  amount-from-enrollment behavior (see the `enrollments` bullet above) —
+  don't reintroduce a manual `Amount` input for `monthly_fair` payments
+  without re-confirming with the user. **Maintenance/Car Docs/Fuel do
   not auto-create a Payment row** — flagged as an open question in
   `05-maintenance.md`/`07-payment.md` and resolved as manual for
   Maintenance/Car Docs (see "Project state"); Fuel's linkage was added
@@ -498,7 +511,13 @@ create button, since there's nothing to create.
   and an enrollment option via `enrollmentRecordLabel(enrollment)`
   (`${vendor name} — ${monthly_fare}/mo`), matching
   `maintenanceRecordLabel`/`carDocRecordLabel`'s one-line-identifying-string
-  shape.
+  shape. Unlike the other three, `associated_enrollment` is `required` on
+  its `<select>` (no "no linked enrollment" empty option), matching backend
+  validation now requiring it for `monthly_fair`; the manual `Amount`
+  `<input>` is hidden outright (not shown read-only) whenever `type ===
+  'monthly_fair'`, since `PaymentService` derives and overwrites `amount`
+  from the linked Enrollment server-side regardless of what's submitted —
+  user's explicit call, don't reintroduce it without asking.
 - `CarDocsPage.tsx` colors an already-past `expiry_date` cell with
   `.expired` (`var(--status-critical)`, defined in the page's own CSS
   file rather than `App.css` since no other feature needs it yet) — a
@@ -546,18 +565,25 @@ feature:
 
 ### Domain model, in one paragraph
 
-A **Car Owner** owns one or more **Cars**. Each Car is leased to a
-**Vendor** (who pays a monthly fare) and has a **Driver** assigned to
-operate it — both are current-assignment foreign keys on `cars`, not
-history tables. **Maintenance** and **Car Docs** are car-scoped records for
-servicing and document tracking respectively. **Payment** is the single
-ledger of all money movements for a car (`type`: `service`, `document`,
-`monthly_fair`, `other`), optionally linked back to the Maintenance or
-CarDocs record that generated it. **Revenue** has no table of its own — it
-is a dashboard computed on the fly from Payment records: `monthly_fair`
-payments count as income, every other type is deducted as expense. None of
-this connects to **Auth** — `users` is an isolated login identity gating
-access to the whole API; there's no ownership/role model.
+A **Car Owner** owns one or more **Cars**. Each Car has a **Driver**
+assigned to operate it — a current-assignment foreign key on `cars`, not a
+history table. A Car's relationship to a **Vendor** is different: it's a
+dated lease tracked by **Enrollment** (`car_id` + `vendor_id` +
+`monthly_fare` + `start_date`/`end_date`, `end_date IS NULL` meaning
+currently active) rather than a bare FK on `cars` — a vendor leases
+specific cars for specific periods at a per-period fare, and a returned car
+has a gap where no fare accrues until it's re-leased. **Maintenance** and
+**Car Docs** are car-scoped records for servicing and document tracking
+respectively. **Payment** is the single ledger of all money movements for a
+car (`type`: `service`, `document`, `fuel`, `monthly_fair`, `other`),
+optionally linked back to the Maintenance/CarDocs/Fuel record that
+generated it — except `monthly_fair`, whose link to an Enrollment is
+**mandatory**, and whose `amount` is always derived from that Enrollment's
+`monthly_fare` rather than entered by hand. **Revenue** has no table of its
+own — it is a dashboard computed on the fly from Payment records:
+`monthly_fair` payments count as income, every other type is deducted as
+expense. None of this connects to **Auth** — `users` is an isolated login
+identity gating access to the whole API; there's no ownership/role model.
 
 ### Conventions (see `00-overview.md` for full detail)
 - Every table: `id` (UUID PK), `created_at`, `updated_at`.

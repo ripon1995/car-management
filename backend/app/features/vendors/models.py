@@ -1,8 +1,7 @@
 import uuid
 from datetime import datetime
-from decimal import Decimal
 
-from sqlalchemy import Numeric, String, Text, Uuid
+from sqlalchemy import String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
@@ -17,7 +16,6 @@ class Vendor(Base):
     address: Mapped[str] = mapped_column(Text, nullable=False)
     contact_number: Mapped[str] = mapped_column(String, nullable=False)
     whatsapp_number: Mapped[str | None] = mapped_column(String, nullable=True)
-    monthly_fare: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         server_default=func.now(), onupdate=func.now(), nullable=False

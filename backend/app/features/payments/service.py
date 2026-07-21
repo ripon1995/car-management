@@ -9,6 +9,7 @@ from app.core.exceptions import NotFoundException, ValidationException
 from app.db.session import get_db
 from app.features.car_docs.repository import CarDocRepository
 from app.features.cars.repository import CarRepository
+from app.features.enrollments.repository import EnrollmentRepository
 from app.features.fuel.repository import FuelRepository
 from app.features.maintenance.repository import MaintenanceRepository
 from app.features.payments.models import Payment
@@ -26,21 +27,31 @@ class PaymentService:
         maintenance_repository: MaintenanceRepository,
         car_doc_repository: CarDocRepository,
         fuel_repository: FuelRepository,
+        enrollment_repository: EnrollmentRepository,
     ) -> None:
         self.repository = repository
         self.car_repository = car_repository
         self.maintenance_repository = maintenance_repository
         self.car_doc_repository = car_doc_repository
         self.fuel_repository = fuel_repository
+        self.enrollment_repository = enrollment_repository
 
     async def create(self, payload: PaymentCreate) -> Payment:
         self._validate_type(payload.type)
         self._validate_amount(payload.amount)
         self._validate_associations(
-            payload.type, payload.associated_maintenance, payload.associated_cardocs, payload.associated_fuel
+            payload.type,
+            payload.associated_maintenance,
+            payload.associated_cardocs,
+            payload.associated_fuel,
+            payload.associated_enrollment,
         )
         await self._validate_references(
-            payload.car_id, payload.associated_maintenance, payload.associated_cardocs, payload.associated_fuel
+            payload.car_id,
+            payload.associated_maintenance,
+            payload.associated_cardocs,
+            payload.associated_fuel,
+            payload.associated_enrollment,
         )
         return await self.repository.create(**payload.model_dump())
 
@@ -70,26 +81,36 @@ class PaymentService:
         if "amount" in updates:
             self._validate_amount(updates["amount"])
 
-        if any(
-            field in updates
-            for field in ("type", "associated_maintenance", "associated_cardocs", "associated_fuel")
-        ):
+        association_fields = (
+            "type",
+            "associated_maintenance",
+            "associated_cardocs",
+            "associated_fuel",
+            "associated_enrollment",
+        )
+        if any(field in updates for field in association_fields):
             self._validate_associations(
                 updates.get("type", payment.type),
                 updates.get("associated_maintenance", payment.associated_maintenance),
                 updates.get("associated_cardocs", payment.associated_cardocs),
                 updates.get("associated_fuel", payment.associated_fuel),
+                updates.get("associated_enrollment", payment.associated_enrollment),
             )
 
-        if any(
-            field in updates
-            for field in ("car_id", "associated_maintenance", "associated_cardocs", "associated_fuel")
-        ):
+        reference_fields = (
+            "car_id",
+            "associated_maintenance",
+            "associated_cardocs",
+            "associated_fuel",
+            "associated_enrollment",
+        )
+        if any(field in updates for field in reference_fields):
             await self._validate_references(
                 updates.get("car_id", payment.car_id),
                 updates.get("associated_maintenance", payment.associated_maintenance),
                 updates.get("associated_cardocs", payment.associated_cardocs),
                 updates.get("associated_fuel", payment.associated_fuel),
+                updates.get("associated_enrollment", payment.associated_enrollment),
             )
 
         return await self.repository.update(payment, updates)
@@ -114,6 +135,7 @@ class PaymentService:
         associated_maintenance: uuid.UUID | None,
         associated_cardocs: uuid.UUID | None,
         associated_fuel: uuid.UUID | None,
+        associated_enrollment: uuid.UUID | None,
     ) -> None:
         if associated_maintenance is not None and type != "service":
             raise ValidationException("associated_maintenance can only be set when type is 'service'")
@@ -121,6 +143,8 @@ class PaymentService:
             raise ValidationException("associated_cardocs can only be set when type is 'document'")
         if associated_fuel is not None and type != "fuel":
             raise ValidationException("associated_fuel can only be set when type is 'fuel'")
+        if associated_enrollment is not None and type != "monthly_fair":
+            raise ValidationException("associated_enrollment can only be set when type is 'monthly_fair'")
 
     async def _validate_references(
         self,
@@ -128,6 +152,7 @@ class PaymentService:
         associated_maintenance: uuid.UUID | None,
         associated_cardocs: uuid.UUID | None,
         associated_fuel: uuid.UUID | None,
+        associated_enrollment: uuid.UUID | None,
     ) -> None:
         if await self.car_repository.get_by_id(car_id) is None:
             raise NotFoundException(f"Car {car_id} not found")
@@ -146,6 +171,11 @@ class PaymentService:
             and await self.fuel_repository.get_by_id(associated_fuel) is None
         ):
             raise NotFoundException(f"Fuel record {associated_fuel} not found")
+        if (
+            associated_enrollment is not None
+            and await self.enrollment_repository.get_by_id(associated_enrollment) is None
+        ):
+            raise NotFoundException(f"Enrollment {associated_enrollment} not found")
 
 
 def get_payment_service(db: AsyncSession = Depends(get_db)) -> PaymentService:
@@ -155,4 +185,5 @@ def get_payment_service(db: AsyncSession = Depends(get_db)) -> PaymentService:
         MaintenanceRepository(db),
         CarDocRepository(db),
         FuelRepository(db),
+        EnrollmentRepository(db),
     )

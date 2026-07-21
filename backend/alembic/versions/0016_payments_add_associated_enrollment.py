@@ -1,0 +1,32 @@
+"""payments: add associated_enrollment
+
+Revision ID: 0016
+Revises: 0015
+Create Date: 2026-07-22
+
+"""
+from typing import Sequence, Union
+
+import sqlalchemy as sa
+from alembic import op
+
+revision: str = "0016"
+down_revision: Union[str, Sequence[str], None] = "0015"
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade() -> None:
+    op.add_column(
+        "payments",
+        sa.Column(
+            "associated_enrollment",
+            sa.Uuid(as_uuid=True),
+            sa.ForeignKey("enrollments.id"),
+            nullable=True,
+        ),
+    )
+
+
+def downgrade() -> None:
+    op.drop_column("payments", "associated_enrollment")

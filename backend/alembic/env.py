@@ -22,6 +22,7 @@ from app.features.maintenance import models as _maintenance_models  # noqa: F401
 from app.features.car_docs import models as _car_docs_models  # noqa: F401
 from app.features.payments import models as _payments_models  # noqa: F401
 from app.features.fuel import models as _fuel_models  # noqa: F401
+from app.features.enrollments import models as _enrollments_models  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

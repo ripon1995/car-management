@@ -23,6 +23,9 @@ class Payment(Base):
     associated_fuel: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("fuel_records.id"), nullable=True
     )
+    associated_enrollment: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("enrollments.id"), nullable=True
+    )
     car_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("cars.id"), nullable=False)
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     payment_date: Mapped[date] = mapped_column(Date, nullable=False)

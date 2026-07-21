@@ -13,6 +13,8 @@ source data the [Revenue](08-revenue.md) dashboard aggregates.
 | type                   | varchar       | yes      | enum: `service`, `document`, `monthly_fair`, `other` |
 | associated_maintenance | uuid (FK)     | no       | → `maintenance_records.id`, set when `type = service` |
 | associated_cardocs     | uuid (FK)     | no       | → `car_docs.id`, set when `type = document` |
+| associated_fuel        | uuid (FK)     | no       | → `fuel_records.id`, set when `type = fuel` — **(added)** in migration `0012`, after the [Fuel](../../../CLAUDE.md) feature was added post-launch |
+| associated_enrollment  | uuid (FK)     | no       | → `enrollments.id`, set when `type = monthly_fair` — **(added)** in migration `0016`, after the Enrollment feature (see `CLAUDE.md`) replaced `vendors.monthly_fare`/`cars.vendor_id` |
 | car_id                 | uuid (FK)     | yes      | → `cars.id` — **(added)** not in the original field list; needed so `monthly_fair`/`other` payments (which have no associated_maintenance/associated_cardocs to derive a car from) can still be attributed to a car for the Revenue dashboard |
 | amount                 | numeric(12,2) | yes      | **(added)** not in the original field list; entered directly on the payment regardless of type — required for Revenue math to work, including `type = other` which has no linked record to pull a cost from |
 | payment_date           | date          | yes      | **(added)** not in the original field list; required to group Revenue's bar chart by period (e.g. month) |
@@ -28,6 +30,15 @@ source data the [Revenue](08-revenue.md) dashboard aggregates.
   that generated this payment (`type = service`).
 - `associated_cardocs` → optionally links to the Car Doc record that
   generated this payment (`type = document`).
+- `associated_fuel` → optionally links to the Fuel record that generated
+  this payment (`type = fuel`).
+- `associated_enrollment` → optionally links to the Enrollment (dated
+  car↔vendor lease) that generated this payment (`type = monthly_fair`).
+  Unlike the others, these can also be created in bulk via
+  `POST /api/v1/enrollments/{id}/generate-payments`, which fills in a
+  `monthly_fair` Payment for every month the enrollment was active and
+  doesn't have one yet — still a manually-triggered action, not a
+  scheduler.
 
 ## API Endpoints
 - `GET /api/v1/payments` — list, filter by `car_id`, `type`, date range;
@@ -41,7 +52,10 @@ source data the [Revenue](08-revenue.md) dashboard aggregates.
 - `amount` must be >= 0. Sign is not stored — whether a payment adds to or
   subtracts from Revenue is derived from `type` (see Revenue calculation).
 - `associated_maintenance` should only be set when `type = service`;
-  `associated_cardocs` should only be set when `type = document`.
-- Both `associated_maintenance` and `associated_cardocs` are optional even
-  for their matching type, since a payment may exist without a formal
-  Maintenance/CarDocs record (e.g. ad-hoc expense).
+  `associated_cardocs` should only be set when `type = document`;
+  `associated_fuel` should only be set when `type = fuel`;
+  `associated_enrollment` should only be set when `type = monthly_fair`.
+- All four `associated_*` fields are optional even for their matching type,
+  since a payment may exist without a formal linked record (e.g. ad-hoc
+  expense, or a `monthly_fair` payment entered by hand rather than via
+  Enrollment's generate-payments action).

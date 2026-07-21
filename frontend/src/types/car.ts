@@ -8,7 +8,6 @@ export interface Car {
   chassis_number: string
   tyre_size: string
   owner_id: string
-  vendor_id: string | null
   driver_id: string | null
   created_at: string
   updated_at: string
@@ -23,7 +22,6 @@ export interface CarInput {
   chassis_number: string
   tyre_size: string
   owner_id: string
-  vendor_id?: string | null
   driver_id?: string | null
 }
 

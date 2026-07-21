@@ -7,6 +7,7 @@ import type { Car, CarInput } from '../types/car'
 import type { CarOwner } from '../types/carOwner'
 import type { Vendor } from '../types/vendor'
 import type { Driver } from '../types/driver'
+import type { Enrollment } from '../types/enrollment'
 import './CarsPage.css'
 
 const currentYear = new Date().getFullYear()
@@ -20,7 +21,6 @@ const emptyForm: CarInput = {
   chassis_number: '',
   tyre_size: '',
   owner_id: '',
-  vendor_id: '',
   driver_id: '',
 }
 
@@ -33,6 +33,7 @@ function CarsPage() {
   const [owners, setOwners] = useState<CarOwner[]>([])
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [drivers, setDrivers] = useState<Driver[]>([])
+  const [activeEnrollments, setActiveEnrollments] = useState<Enrollment[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<ApiError | null>(null)
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -45,13 +46,20 @@ function CarsPage() {
   useEffect(() => {
     let cancelled = false
     setIsLoading(true)
-    Promise.all([api.listCars(), api.listCarOwners(), api.listVendors(), api.listDrivers()])
-      .then(([carsData, ownersData, vendorsData, driversData]) => {
+    Promise.all([
+      api.listCars(),
+      api.listCarOwners(),
+      api.listVendors(),
+      api.listDrivers(),
+      api.listEnrollments({ active: true }),
+    ])
+      .then(([carsData, ownersData, vendorsData, driversData, enrollmentsData]) => {
         if (cancelled) return
         setCars(carsData)
         setOwners(ownersData)
         setVendors(vendorsData)
         setDrivers(driversData)
+        setActiveEnrollments(enrollmentsData)
       })
       .catch((err) => {
         if (!cancelled) setError(toApiError(err))
@@ -68,9 +76,10 @@ function CarsPage() {
     return owners.find((owner) => owner.id === ownerId)?.name ?? '—'
   }
 
-  function vendorName(vendorId: string | null) {
-    if (!vendorId) return '—'
-    return vendors.find((vendor) => vendor.id === vendorId)?.name ?? '—'
+  function vendorName(carId: string) {
+    const enrollment = activeEnrollments.find((e) => e.car_id === carId)
+    if (!enrollment) return '—'
+    return vendors.find((vendor) => vendor.id === enrollment.vendor_id)?.name ?? '—'
   }
 
   function driverName(driverId: string | null) {
@@ -96,7 +105,6 @@ function CarsPage() {
       chassis_number: car.chassis_number,
       tyre_size: car.tyre_size,
       owner_id: car.owner_id,
-      vendor_id: car.vendor_id ?? '',
       driver_id: car.driver_id ?? '',
     })
     setIsFormOpen(true)
@@ -136,7 +144,6 @@ function CarsPage() {
       ...form,
       model_name: form.model_name || null,
       registration_number: form.registration_number || null,
-      vendor_id: form.vendor_id || null,
       driver_id: form.driver_id || null,
     }
     try {
@@ -275,20 +282,6 @@ function CarsPage() {
               </select>
             </label>
             <label className="form-field">
-              <span className="form-field-label">Vendor (optional)</span>
-              <select
-                value={form.vendor_id ?? ''}
-                onChange={(event) => setForm((f) => ({ ...f, vendor_id: event.target.value }))}
-              >
-                <option value="">Unassigned</option>
-                {vendors.map((vendor) => (
-                  <option key={vendor.id} value={vendor.id}>
-                    {vendor.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="form-field">
               <span className="form-field-label">Driver (optional)</span>
               <select
                 value={form.driver_id ?? ''}
@@ -361,7 +354,7 @@ function CarsPage() {
               </div>
               <div>
                 <dt>Vendor</dt>
-                <dd>{vendorName(viewingCar.vendor_id)}</dd>
+                <dd>{vendorName(viewingCar.id)}</dd>
               </div>
               <div>
                 <dt>Driver</dt>
@@ -417,7 +410,7 @@ function CarsPage() {
                   <td>{car.model_year}</td>
                   <td>{car.registration_number ?? '—'}</td>
                   <td>{ownerName(car.owner_id)}</td>
-                  <td>{vendorName(car.vendor_id)}</td>
+                  <td>{vendorName(car.id)}</td>
                   <td>{driverName(car.driver_id)}</td>
                   <td className="data-table-actions">
                     <button

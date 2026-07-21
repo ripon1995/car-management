@@ -13,7 +13,6 @@ class CarCreate(BaseModel):
     chassis_number: str
     tyre_size: str
     owner_id: uuid.UUID
-    vendor_id: uuid.UUID | None = None
     driver_id: uuid.UUID | None = None
 
 
@@ -26,7 +25,6 @@ class CarUpdate(BaseModel):
     chassis_number: str | None = None
     tyre_size: str | None = None
     owner_id: uuid.UUID | None = None
-    vendor_id: uuid.UUID | None = None
     driver_id: uuid.UUID | None = None
 
 
@@ -42,7 +40,6 @@ class CarRead(BaseModel):
     chassis_number: str
     tyre_size: str
     owner_id: uuid.UUID
-    vendor_id: uuid.UUID | None
     driver_id: uuid.UUID | None
     created_at: datetime
     updated_at: datetime

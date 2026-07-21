@@ -12,7 +12,6 @@ from app.features.cars.models import Car
 from app.features.cars.repository import CarRepository
 from app.features.cars.schemas import CarCreate, CarUpdate
 from app.features.drivers.repository import DriverRepository
-from app.features.vendors.repository import VendorRepository
 
 MIN_MODEL_YEAR = 1980
 
@@ -24,18 +23,16 @@ class CarService:
         self,
         repository: CarRepository,
         owner_repository: CarOwnerRepository,
-        vendor_repository: VendorRepository,
         driver_repository: DriverRepository,
     ) -> None:
         self.repository = repository
         self.owner_repository = owner_repository
-        self.vendor_repository = vendor_repository
         self.driver_repository = driver_repository
 
     async def create(self, payload: CarCreate) -> Car:
         await self._validate_model_year(payload.model_year)
         await self._validate_unique_numbers(payload.engine_number, payload.chassis_number)
-        await self._validate_references(payload.owner_id, payload.vendor_id, payload.driver_id)
+        await self._validate_references(payload.owner_id, payload.driver_id)
         return await self.repository.create(**payload.model_dump())
 
     async def list_all(self) -> list[Car]:
@@ -61,10 +58,9 @@ class CarService:
                 engine_number, chassis_number, exclude_car_id=car.id
             )
 
-        if any(field in updates for field in ("owner_id", "vendor_id", "driver_id")):
+        if any(field in updates for field in ("owner_id", "driver_id")):
             await self._validate_references(
                 updates.get("owner_id", car.owner_id),
-                updates.get("vendor_id", car.vendor_id),
                 updates.get("driver_id", car.driver_id),
             )
 
@@ -77,6 +73,7 @@ class CarService:
 
     async def _check_not_referenced(self, car_id: uuid.UUID) -> None:
         from app.features.car_docs.models import CarDoc
+        from app.features.enrollments.models import Enrollment
         from app.features.fuel.models import FuelRecord
         from app.features.maintenance.models import MaintenanceRecord
         from app.features.payments.models import Payment
@@ -86,6 +83,7 @@ class CarService:
             (CarDoc, "car docs"),
             (Payment, "payments"),
             (FuelRecord, "fuel records"),
+            (Enrollment, "enrollments"),
         ):
             referenced = await self.repository.db.scalar(
                 select(model.id).where(model.car_id == car_id).limit(1)
@@ -119,13 +117,10 @@ class CarService:
     async def _validate_references(
         self,
         owner_id: uuid.UUID,
-        vendor_id: uuid.UUID | None,
         driver_id: uuid.UUID | None,
     ) -> None:
         if await self.owner_repository.get_by_id(owner_id) is None:
             raise NotFoundException(f"Car owner {owner_id} not found")
-        if vendor_id is not None and await self.vendor_repository.get_by_id(vendor_id) is None:
-            raise NotFoundException(f"Vendor {vendor_id} not found")
         if driver_id is not None and await self.driver_repository.get_by_id(driver_id) is None:
             raise NotFoundException(f"Driver {driver_id} not found")
 
@@ -134,6 +129,5 @@ def get_car_service(db: AsyncSession = Depends(get_db)) -> CarService:
     return CarService(
         CarRepository(db),
         CarOwnerRepository(db),
-        VendorRepository(db),
         DriverRepository(db),
     )

@@ -8,6 +8,7 @@ export interface Payment {
   associated_maintenance: string | null
   associated_cardocs: string | null
   associated_fuel: string | null
+  associated_enrollment: string | null
   car_id: string
   amount: number
   payment_date: string
@@ -23,6 +24,7 @@ export interface PaymentInput {
   associated_maintenance?: string | null
   associated_cardocs?: string | null
   associated_fuel?: string | null
+  associated_enrollment?: string | null
   car_id: string
   amount: number
   payment_date: string

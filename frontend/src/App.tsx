@@ -8,6 +8,7 @@ import RegisterPage from './pages/RegisterPage'
 import DashboardPage from './pages/DashboardPage'
 import CarOwnersPage from './pages/CarOwnersPage'
 import CarsPage from './pages/CarsPage'
+import EnrollmentsPage from './pages/EnrollmentsPage'
 import VendorsPage from './pages/VendorsPage'
 import DriversPage from './pages/DriversPage'
 import MaintenancePage from './pages/MaintenancePage'
@@ -54,6 +55,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <CarsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/enrollments"
+              element={
+                <ProtectedRoute>
+                  <EnrollmentsPage />
                 </ProtectedRoute>
               }
             />

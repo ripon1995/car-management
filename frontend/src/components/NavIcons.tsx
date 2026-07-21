@@ -45,6 +45,23 @@ export function CarsIcon() {
   )
 }
 
+export function EnrollmentIcon() {
+  return (
+    <svg {...iconProps()}>
+      <rect x="3.5" y="4.5" width="17" height="16" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M3.5 9h17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M8 3v3M16 3v3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path
+        d="M8.5 14.5l2 2 4.5-4.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
 export function VendorsIcon() {
   return (
     <svg {...iconProps()}>

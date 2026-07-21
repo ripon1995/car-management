@@ -22,9 +22,6 @@ class Car(Base):
     owner_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("car_owners.id"), nullable=False
     )
-    vendor_id: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid(as_uuid=True), ForeignKey("vendors.id"), nullable=True
-    )
     driver_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("drivers.id"), nullable=True
     )

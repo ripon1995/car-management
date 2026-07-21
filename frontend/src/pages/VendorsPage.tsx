@@ -11,7 +11,6 @@ const emptyForm: VendorInput = {
   address: '',
   contact_number: '',
   whatsapp_number: '',
-  monthly_fare: 0,
 }
 
 function toApiError(err: unknown): ApiError {
@@ -62,7 +61,6 @@ function VendorsPage() {
       address: vendor.address,
       contact_number: vendor.contact_number,
       whatsapp_number: vendor.whatsapp_number ?? '',
-      monthly_fare: vendor.monthly_fare,
     })
     setIsFormOpen(true)
   }
@@ -188,23 +186,6 @@ function VendorsPage() {
                 onChange={(event) => setForm((f) => ({ ...f, whatsapp_number: event.target.value }))}
               />
             </label>
-            <label className="form-field">
-              <span className="form-field-label">Monthly fare</span>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="e.g. 1500.00"
-                value={form.monthly_fare === 0 ? '' : form.monthly_fare}
-                onChange={(event) =>
-                  setForm((f) => ({
-                    ...f,
-                    monthly_fare: event.target.value === '' ? 0 : Number(event.target.value),
-                  }))
-                }
-                required
-              />
-            </label>
             <div className="modal-actions">
               <button type="button" className="secondary" onClick={closeForm} disabled={isSubmitting}>
                 Cancel
@@ -245,10 +226,6 @@ function VendorsPage() {
                 <dd>{viewingVendor.whatsapp_number ?? '—'}</dd>
               </div>
               <div>
-                <dt>Monthly fare</dt>
-                <dd>{viewingVendor.monthly_fare}</dd>
-              </div>
-              <div>
                 <dt>Created</dt>
                 <dd>{new Date(viewingVendor.created_at).toLocaleString()}</dd>
               </div>
@@ -282,7 +259,6 @@ function VendorsPage() {
                 <th>Name</th>
                 <th>Contact number</th>
                 <th>WhatsApp number</th>
-                <th>Monthly fare</th>
                 <th>Action</th>
               </tr>
             </thead>
@@ -293,7 +269,6 @@ function VendorsPage() {
                   <td>{vendor.name}</td>
                   <td>{vendor.contact_number}</td>
                   <td>{vendor.whatsapp_number ?? '—'}</td>
-                  <td>{vendor.monthly_fare}</td>
                   <td className="data-table-actions">
                     <button
                       type="button"

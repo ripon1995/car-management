@@ -2,52 +2,32 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+For the "why" behind naming/rename history, features that shipped without a
+written spec, and migration-by-migration narration, see `docs/decisions.md`
+(not auto-loaded — read it on demand).
+
 ## Project state
 
-All 8 business features plus Auth are fully built on both sides. Backend
-(FastAPI app, separate Auth/User JWT login): Car Owner, Vendor, Driver,
-Car, Maintenance, Car Docs, and Payment CRUD, plus the read-only Revenue
-aggregation endpoint. Frontend (Vite + React + TypeScript, routing, auth
-pages, nav shell): Car Owner, Vendor, Driver, Car, Maintenance, Car Docs,
-and Payment pages all built to the same conventions (see "Frontend
-architecture" below), plus the Revenue dashboard at `/dashboard`
-(`DashboardPage.tsx`) with hand-rolled SVG donut/bar charts. Maintenance
-and Car Docs do **not** auto-create their linked Payment row — that was an
-open question in the feature docs, resolved as: Payments are created
-manually/independently on the Payments page (matches the plain-CRUD
-pattern of every other feature; user's explicit call, don't revisit
-without asking).
+10 features are fully built on both sides: the original 8 business
+features (Car Owner, Vendor, Driver, Car, Maintenance, Car Docs, Payment,
+Revenue) plus Auth, plus **Fuel** and **Lease** added later directly off
+user instruction (no feature doc — see `docs/decisions.md` for the
+rationale behind each). Backend: FastAPI app with a separate Auth/User JWT
+login, full CRUD for every feature except the read-only Revenue
+aggregation endpoint. Frontend: Vite + React + TypeScript, routing, auth
+pages, nav shell, a page per feature to the same conventions (see
+"Frontend architecture" below), plus the Revenue dashboard at `/dashboard`
+(`DashboardPage.tsx`) with hand-rolled SVG donut/bar charts.
 
-A 9th feature, **Fuel**, was added after the original 8 (no feature doc —
-built directly off user instruction, following the same
-repository/service/router + page/api/types pattern as every other
-feature). See "Backend architecture"/"Frontend architecture" below for its
-shape; every field beyond `car_id`/`cost` is an **(added)**/**(assumption)**
-choice made to satisfy the user's stated purpose ("track fuel consumption"
-+ "cost management"), not from a written spec — worth confirming with the
-user before extending it further.
+Lease is the current name for what shipped as "Enrollment" — code, docs,
+and this file all say "Lease" throughout; migrations `0013`–`0016` still
+say "enrollment" in their filenames/content since that was accurate at the
+time they ran (don't rename them — see `docs/decisions.md`).
 
-A 10th feature, **Lease**, replaced `vendors.monthly_fare` and
-`cars.vendor_id` (also no feature doc, same built-directly-off-user-
-instruction basis as Fuel). The original model had a single static fare per
-vendor and a bare "current vendor" FK on Car with no dates; the user's real
-need was that a vendor leases specific cars for *dated periods* at a
-per-period fare, and a returned car should have a gap where no fare accrues
-until it's re-leased. `cars.vendor_id` is gone entirely — "current vendor
-for a car" is now derived by looking up the Lease for that car with
-`end_date IS NULL`. See "Backend architecture"/"Frontend architecture"
-below for the full shape. **Naming history:** this feature was originally
-built and shipped as "Enrollment" (`app/features/enrollments/`, table
-`enrollments`, `associated_enrollment` on Payment, nav label
-"Enrollments") — the word didn't fit a car-leasing domain, so everything
-was renamed to "Lease" shortly after (user's explicit call). The rename
-touched the backend package/model/table/column/routes, the frontend
-page/types/api module/nav entry, and this doc; migration `0017` is the
-actual DB rename (`enrollments` → `leases` table, `associated_enrollment` →
-`associated_lease` column, plus indexes/constraints) — migrations `0013`
-through `0016` still say "enrollment" in their filenames/content because
-that was the accurate name *at the time* they ran; don't rewrite migration
-history to pretend the name was always "Lease".
+Maintenance, Car Docs, and Fuel do **not** auto-create a linked Payment
+row — Payments are always created manually/independently on the Payments
+page. Don't add auto-creation without re-confirming with the user (see
+`docs/decisions.md` for the resolved history on this).
 
 **No unit tests in this project by explicit user instruction** — don't add
 a test suite unless asked.
@@ -92,6 +72,13 @@ without a fix, concurrent requests intermittently fail with
 passes `connect_args={"statement_cache_size": 0}` to `create_async_engine`
 to disable that cache; don't remove it.
 
+**Known environment quirk:** this venv is Python 3.14 (very new). Standard
+`passlib[bcrypt]` fails at runtime here (`AttributeError: module 'bcrypt'
+has no attribute '__about__'`) because passlib is unmaintained and doesn't
+support modern `bcrypt`. Use the `bcrypt` package's `hashpw`/`checkpw`
+directly instead, as `app/core/security.py` already does — don't
+reintroduce `passlib`.
+
 ## Backend architecture
 
 The backend is organized **feature-first**, not by technical layer: each
@@ -103,9 +90,8 @@ cross-cutting infrastructure lives outside `app/features/`.
   `ENVIRONMENT`, `ALLOW_ORIGINS`, `JWT_SECRET_KEY`, `JWT_ALGORITHM`,
   `ACCESS_TOKEN_EXPIRE_MINUTES` from `.env`.
 - `app/core/security.py` — generic, feature-agnostic crypto helpers:
-  password hashing/verification (`bcrypt` directly — **not** `passlib`,
-  which is unmaintained and broken with `bcrypt>=4.1`, see below) and JWT
-  creation/decoding (`python-jose`).
+  password hashing/verification (`bcrypt` directly, not `passlib` — see the
+  environment quirk above) and JWT creation/decoding (`python-jose`).
 - `app/core/exceptions.py` — `AppException` base class (`error_code`,
   `error_status`, `message` as class defaults; `detail` is the per-raise
   context) plus subclasses `AuthenticationException`,
@@ -119,9 +105,8 @@ cross-cutting infrastructure lives outside `app/features/`.
   `RequestLoggerMiddleware` (logs method/path/status/duration per request).
 - `app/db/` — async SQLAlchemy engine/session (`asyncpg` driver) and the
   shared declarative `Base`.
-- Each feature package follows a **repository → service → router**
-  layering — every feature (including Maintenance, Car Docs, and Payment)
-  follows this template:
+- Every feature package follows a **repository → service → router**
+  layering, including Maintenance, Car Docs, and Payment:
   - `models.py` — SQLAlchemy model(s).
   - `schemas.py` — Pydantic request/response models.
   - `repository.py` — a `<Feature>Repository` class wrapping the
@@ -168,24 +153,21 @@ cross-cutting infrastructure lives outside `app/features/`.
   (rather than relying on the raw FK `IntegrityError` from Postgres) — copy
   this pattern for any other feature whose deletion must be restricted
   while referenced elsewhere. `VendorService.delete()` does the same but
-  against `app.features.leases.models.Lease.vendor_id` (any row,
-  not just an active one) rather than `Car` directly, since a vendor's
-  relationship to cars is now only through Lease — see the
-  `app/features/leases/` bullet below. Vendor has **no fare field of
-  its own** anymore; `monthly_fare` lives on Lease (dropped from
-  `vendors` in migration `0015`, see "Project state"). `CarService.delete()`
-  applies the same referenced-check pattern in the other direction, checking
-  `MaintenanceRecord`/`CarDoc`/`Payment`/`FuelRecord`/`Lease` for any
-  row whose `car_id` points at the car being deleted.
+  against `app.features.leases.models.Lease.vendor_id` (any row, not just
+  an active one), since a vendor's relationship to cars is now only
+  through Lease. Vendor has **no fare field of its own** anymore —
+  `monthly_fare` lives on Lease. `CarService.delete()` applies the same
+  referenced-check pattern in the other direction, checking
+  `MaintenanceRecord`/`CarDoc`/`Payment`/`FuelRecord`/`Lease` for any row
+  whose `car_id` points at the car being deleted.
 - `app/features/cars/` — the hub entity, with FKs to `car_owners`
   (`owner_id`, required) and `drivers` (`driver_id`, optional). **No
-  `vendor_id`** — dropped in migration `0014` (see "Project state"); a car's
-  current vendor is derived by looking up its Lease with `end_date IS
-  NULL`, not stored on the car itself. `CarService` takes the Car Owner and
-  Driver repositories as constructor args (see `get_car_service`, no longer
-  takes a `VendorRepository`) and validates: `model_year` is in `[1980,
-  current_year + 1]`; `engine_number`/`chassis_number` are unique
-  (`ConflictException`, checked via
+  `vendor_id`** — a car's current vendor is derived by looking up its
+  Lease with `end_date IS NULL`, not stored on the car itself. `CarService`
+  takes the Car Owner and Driver repositories as constructor args (see
+  `get_car_service`, no `VendorRepository`) and validates: `model_year` is
+  in `[1980, current_year + 1]`; `engine_number`/`chassis_number` are
+  unique (`ConflictException`, checked via
   `CarRepository.get_by_engine_number`/`get_by_chassis_number`); and that
   `owner_id`/`driver_id` reference rows that actually exist
   (`NotFoundException`) — reuse this
@@ -194,126 +176,101 @@ cross-cutting infrastructure lives outside `app/features/`.
   endpoint (not a separate reassignment `PATCH`) since `CarUpdate` already
   makes every field optional and applies via `exclude_unset` — same
   convention as `car_owners`. No pagination/filtering on `GET /cars` yet,
-  matching `car_owners`' current (also not-yet-implemented) state.
+  matching `car_owners`.
 - `app/features/maintenance/` and `app/features/car_docs/` — car-scoped
   records, both required FK `car_id` → `cars.id` validated via
   `CarRepository`. `MaintenanceService` validates `type` against a fixed
   tuple (`service`/`battery`/`tyre`/`spare_parts`/`engine_oil`) and
   `cost >= 0`; `CarDocService` validates `cost >= 0` only (`expiry_date` is
-  a plain `date`, no enum). Both routers' `GET /` accepts filter query
+  a plain `date`, no enum). Both routers' `GET /` accept filter query
   params (`car_id`, plus `type` for Maintenance and
-  `name`/`expiring_before` for Car Docs) — unlike `cars`/`car_owners`,
-  these were built with filtering from the start since the feature docs
-  call for it explicitly. Both services' `delete()` block with
-  `ConflictException` if a `Payment` row references them via
+  `name`/`expiring_before` for Car Docs). Both services' `delete()` block
+  with `ConflictException` if a `Payment` row references them via
   `associated_maintenance`/`associated_cardocs` (imported inline inside
   the method, not at module level, to avoid a circular import with
-  `app.features.payments.service` which imports these two features'
+  `app.features.payments.service`, which imports these two features'
   repositories).
-- `app/features/fuel/` — the 9th feature (see "Project state"), car-scoped
-  like Maintenance/Car Docs: required FK `car_id` → `cars.id` validated via
-  `CarRepository`. Fields beyond `car_id` are all **(added)**: `fuel_type`
-  (fixed tuple `octane`/`petrol`/`diesel`/`cng`/`other`, validated like
-  Maintenance's `type`), `quantity_liters` (`>= 0`, the consumption-tracking
-  half of the feature), `cost` (`>= 0`, the cost-management half),
-  `odometer_reading` (optional, `>= 0` when present — not used for any
-  computed mileage/efficiency yet, just stored for a future consumption-rate
-  feature), `fuel_station`, `fuel_date` (required `date`, mirroring
-  Payment's `payment_date` rather than Maintenance's plain
-  `created_at`, since cost management over time needs a real transaction
-  date, not just row-creation time), and optional `description`. `GET /`
-  filters by `car_id`, `fuel_type`, and `date_from`/`date_to` over
-  `fuel_date` (same pattern as Payments). `FuelService.delete()` blocks
-  with `ConflictException` if a `Payment` row references it via
-  `associated_fuel` (imported inline inside the method, same
-  avoid-a-circular-import reasoning as Maintenance/Car Docs' delete()
-  below) — added once Payments grew an `associated_fuel` FK (see below);
-  `CarService.delete()` also still blocks deleting a car with fuel
-  records, same as it does for Maintenance/Car Docs/Payment.
-- `app/features/leases/` — the 10th feature (see "Project state"), a
-  dated car↔vendor lease period: required FKs `car_id` → `cars.id` and
-  `vendor_id` → `vendors.id`, plus `monthly_fare` (`>= 0`, **(added)**,
-  lives here rather than on Vendor or Car specifically so a re-lease at a
+- `app/features/fuel/` — car-scoped like Maintenance/Car Docs: required FK
+  `car_id` → `cars.id` validated via `CarRepository`. Fields:
+  `fuel_type` (fixed tuple `octane`/`petrol`/`diesel`/`cng`/`other`,
+  validated like Maintenance's `type`), `quantity_liters` (`>= 0`),
+  `cost` (`>= 0`), `odometer_reading` (optional, `>= 0` when present, not
+  yet used for any computed mileage/efficiency), `fuel_station`,
+  `fuel_date` (required `date`, mirroring Payment's `payment_date`), and
+  optional `description`. `GET /` filters by `car_id`, `fuel_type`, and
+  `date_from`/`date_to` over `fuel_date` (same pattern as Payments).
+  `FuelService.delete()` blocks with `ConflictException` if a `Payment`
+  row references it via `associated_fuel` (inline import, same
+  avoid-circular-import reasoning as Maintenance/Car Docs above);
+  `CarService.delete()` also blocks deleting a car with fuel records.
+- `app/features/leases/` — a dated car↔vendor lease period: required FKs
+  `car_id` → `cars.id` and `vendor_id` → `vendors.id`, plus `monthly_fare`
+  (`>= 0`, lives here rather than on Vendor or Car so a re-lease at a
   renegotiated rate doesn't overwrite history), `start_date` (required),
   `end_date` (nullable — **null means the lease is currently active**,
-  setting it is how a car is "returned"). `LeaseService.create()`
-  rejects with `ConflictException` if the car already has an active
-  (`end_date IS NULL`) lease — only one active lease per car; ending
-  the current one (via `PUT {"end_date": ...}`) is required before starting
+  setting it is how a car is "returned"). `LeaseService.create()` rejects
+  with `ConflictException` if the car already has an active
+  (`end_date IS NULL`) lease — only one active lease per car; ending the
+  current one (via `PUT {"end_date": ...}`) is required before starting
   another. `update()` re-checks the same invariant if an edit would clear
-  `end_date` back to active. `delete()` blocks with `ConflictException` if a
-  `Payment` references it via `associated_lease` (inline import, same
+  `end_date` back to active. `delete()` blocks with `ConflictException` if
+  a `Payment` references it via `associated_lease` (inline import, same
   avoid-circular-import reasoning as Fuel/Maintenance/Car Docs).
   `GET /leases` filters by `car_id`, `vendor_id`, `active`. Two extra
   endpoints exist because rent isn't auto-generated (no scheduler/cron in
-  this app — user's explicit call): `GET /{id}/due-payments` walks months
-  from `start_date` to `min(end_date or today, today)` and buckets each into
-  `due_months`/`generated_months` by checking for an existing `Payment` with
-  `associated_lease == id` in that month; `POST
-  /{id}/generate-payments` bulk-creates a `monthly_fair` Payment (linked via
-  `associated_lease`) for every due month in one call, `paid_by` = the
+  this app): `GET /{id}/due-payments` walks months from `start_date` to
+  `min(end_date or today, today)` and buckets each into
+  `due_months`/`generated_months` by checking for an existing `Payment`
+  with `associated_lease == id` in that month; `POST
+  /{id}/generate-payments` bulk-creates a `monthly_fair` Payment (linked
+  via `associated_lease`) for every due month in one call, `paid_by` = the
   vendor's name, `paid_to` = the car owner's name. Because due-months are
-  computed per-lease-record, a gap between one lease ending and
-  the next starting for the same car naturally has no due months — this is
-  what satisfies "no fare while the car sat idle," don't reintroduce a
-  synced `cars.vendor_id`/cron-based alternative without re-confirming with
-  the user (see "Project state").
-- `app/features/payments/` — the money-movement ledger. Required FKs:
+  computed per-lease-record, a gap between one lease ending and the next
+  starting for the same car naturally has no due months — don't
+  reintroduce a synced `cars.vendor_id`/cron-based alternative without
+  re-confirming with the user.
+- `app/features/payments/` — the money-movement ledger. Required FK:
   `car_id` → `cars.id`; optional FKs: `associated_maintenance` →
   `maintenance_records.id`, `associated_cardocs` → `car_docs.id`,
-  `associated_fuel` → `fuel_records.id` (added in migration `0012`, after
-  Fuel was already live, mirroring the Maintenance/Car Docs linkage
-  pattern exactly — user's explicit call, see "Project state"),
-  `associated_lease` → `leases.id` (added as `associated_enrollment` in
-  migration `0016`, renamed by `0017` — same pattern again). `PaymentService`
-  validates `type` (`service`/`document`/`fuel`/`monthly_fair`/`other`),
-  that `associated_maintenance` is only set when `type == "service"`,
+  `associated_fuel` → `fuel_records.id`, `associated_lease` → `leases.id`.
+  `PaymentService` validates `type`
+  (`service`/`document`/`fuel`/`monthly_fair`/`other`), that
+  `associated_maintenance` is only set when `type == "service"`,
   `associated_cardocs` only when `type == "document"`, `associated_fuel`
   only when `type == "fuel"` (all three optional even for their matching
   type — a payment may exist without a formal linked record), and that
   every referenced id actually exists (`NotFoundException`, via
   `CarRepository`/`MaintenanceRepository`/`CarDocRepository`/
-  `FuelRepository`/`LeaseRepository`). `associated_lease` is
-  different: it's **required, not optional, whenever `type ==
-  "monthly_fair"`** (`ValidationException` if missing — user's explicit
-  call, a `monthly_fair` payment must always trace back to a real lease
-  period), and when it's set, `amount` is **not** taken from the request at
-  all — `PaymentService.create()`/`update()` silently overwrite `amount`
-  with that Lease's `monthly_fare` every time (looked up via
-  `LeaseRepository`), so a `monthly_fair` payment's amount can never
-  drift from its linked lease's rate; `amount` stays a manually-entered
-  required field (validated `>= 0`) only for the other four types. This
-  mirrors `LeaseService.generate_due_payments()`'s existing
-  amount-from-lease behavior (see the `leases` bullet above) —
+  `FuelRepository`/`LeaseRepository`). `associated_lease` is different:
+  it's **required, not optional, whenever `type == "monthly_fair"`**
+  (`ValidationException` if missing — a `monthly_fair` payment must always
+  trace back to a real lease period), and when it's set, `amount` is
+  **not** taken from the request at all — `PaymentService.create()`/
+  `update()` silently overwrite `amount` with that Lease's `monthly_fare`
+  every time (looked up via `LeaseRepository`), so a `monthly_fair`
+  payment's amount can never drift from its linked lease's rate; `amount`
+  stays a manually-entered required field (validated `>= 0`) only for the
+  other four types. This mirrors
+  `LeaseService.generate_due_payments()`'s amount-from-lease behavior —
   don't reintroduce a manual `Amount` input for `monthly_fair` payments
-  without re-confirming with the user. **Maintenance/Car Docs/Fuel do
-  not auto-create a Payment row** — flagged as an open question in
-  `05-maintenance.md`/`07-payment.md` and resolved as manual for
-  Maintenance/Car Docs (see "Project state"); Fuel's linkage was added
-  later under the same manual-only rule, re-confirmed with the user
-  rather than assumed; Lease's linkage is also manual — the *bulk*
-  "generate due payments" action is still a user-triggered click, not a
-  scheduler. Don't add auto-creation without re-confirming with
-  the user first. `GET /payments` filters by `car_id`, `type`, and a
-  `date_from`/`date_to` range over `payment_date`.
-- `app/features/revenue/` — read-only, **no `models.py`/`migration`**:
+  without re-confirming with the user. `GET /payments` filters by
+  `car_id`, `type`, and a `date_from`/`date_to` range over `payment_date`.
+- `app/features/revenue/` — read-only, **no `models.py`/migration**:
   `RevenueService.get_summary()` takes the same `car_id`/date-range filters
   as Payments (via `PaymentRepository.list_all()`), fetches the matching
   Payment rows, and aggregates them in Python (not SQL) into
   `total_income`/`total_expense`/`net_revenue`, a `by_type` breakdown, a
   `by_period` breakdown (grouped by `payment_date.strftime("%Y-%m")`), and
   a `by_car` breakdown that's `null` whenever a single `car_id` is
-  filtered (comparing cars only makes sense when not already scoped to
-  one). `type == "monthly_fair"` is income; every other type is expense —
-  `INCOME_TYPE` constant in `service.py` is the single source of truth for
-  that split, don't duplicate the check. This means `fuel`-type Payments
-  count as expense automatically, with no change needed in this file —
-  that's why Fuel cost only affects the Revenue dashboard once a Payment
-  row (optionally linked via `associated_fuel`) is created for it, not
-  directly from `fuel_records`. Mounted at `GET /api/v1/revenue` with
-  `from`/`to` query param aliases (`Query(alias="from")` — `from` is a
-  Python keyword) rather than `date_from`/`date_to`, matching the exact
-  param names in `08-revenue.md`.
+  filtered. `type == "monthly_fair"` is income; every other type is
+  expense — `INCOME_TYPE` constant in `service.py` is the single source of
+  truth for that split, don't duplicate the check. This means
+  `fuel`-type Payments count as expense automatically; Fuel cost only
+  affects the Revenue dashboard once a Payment row (optionally linked via
+  `associated_fuel`) is created for it, not directly from `fuel_records`.
+  Mounted at `GET /api/v1/revenue` with `from`/`to` query param aliases
+  (`Query(alias="from")` — `from` is a Python keyword) rather than
+  `date_from`/`date_to`, matching `08-revenue.md`.
 - `app/api.py` — thin aggregator that `include_router`s each feature's
   router(s); mounted under `/api/v1` in `app/main.py` (the version prefix
   is deliberate — keep it, don't flatten to bare `/api`). **When adding a
@@ -331,36 +288,12 @@ cross-cutting infrastructure lives outside `app/features/`.
   `app.features.vendors.models`, `app.features.drivers.models`,
   `app.features.cars.models`, `app.features.maintenance.models`,
   `app.features.car_docs.models`, `app.features.payments.models`,
-  `app.features.fuel.models`, `app.features.leases.models`) so its
-  tables register on `Base.metadata` before migrations run — add the new
-  import there too when adding a feature. Migrations `0006`–`0008` create
-  `maintenance_records`/`car_docs`/`payments` in that order (FK
-  dependency order: `payments` references both `maintenance_records` and
-  `car_docs`); `revenue` has no migration since it has no table. `0011`
-  creates `fuel_records` (only FK is `car_id` → `cars.id`, so no
-  dependency ordering concern like `payments` had). `0012` adds
-  `payments.associated_fuel` (nullable FK → `fuel_records.id`) after the
-  fact, once Payments needed to optionally link to Fuel too — a plain
-  `add_column`/`drop_column` pair, not a new table, so it didn't need a
-  new `alembic/env.py` model import. `0013` creates `enrollments` (FKs to
-  both `cars.id` and `vendors.id`); `0014` drops `cars.vendor_id` and
-  `0015` drops `vendors.monthly_fare` — both now redundant once the lease
-  concept is the source of truth for the car↔vendor relationship and its
-  fare (see "Project state"); `0016` adds `payments.associated_enrollment`,
-  same add-column shape as `0012`. `0013` must precede `0016` since
-  Payments' new FK targets the `enrollments` table. `0017` renames
-  `enrollments` → `leases` (table, indexes, PK/FK constraint names) and
-  `payments.associated_enrollment` → `associated_lease` — this is the
-  Enrollment→Lease rename described at the top of this file; **don't
-  rename the `0013`–`0016` files or their content to say "lease"**, they're
-  an accurate record of what the schema was called at the time they ran.
-
-**Known environment quirk:** this venv is Python 3.14 (very new). Standard
-`passlib[bcrypt]` fails at runtime here (`AttributeError: module 'bcrypt'
-has no attribute '__about__'`) because passlib is unmaintained and doesn't
-support modern `bcrypt`. Use the `bcrypt` package's `hashpw`/`checkpw`
-directly instead, as `app/core/security.py` already does — don't
-reintroduce `passlib`.
+  `app.features.fuel.models`, `app.features.leases.models`) so its tables
+  register on `Base.metadata` before migrations run — add the new import
+  there too when adding a feature. Current head is `0017`; see
+  `docs/decisions.md` for the full migration-by-migration history if you
+  need to understand ordering constraints between existing migrations
+  before adding a new one.
 
 ## Frontend architecture
 
@@ -374,29 +307,22 @@ primitive fields) a types file. `app/features/car_owners/` on the backend
 maps to `src/pages/CarOwnersPage.tsx` + `src/api/carOwners.ts` +
 `src/types/carOwner.ts` on the frontend; `vendors`/`drivers`/`cars`/
 `maintenance`/`car_docs`/`payments`/`fuel`/`leases` all follow the same
-layout (`VendorsPage.tsx`/`DriversPage.tsx`/`CarsPage.tsx`/
-`MaintenancePage.tsx`/`CarDocsPage.tsx`/`PaymentsPage.tsx`/`FuelPage.tsx`/
-`LeasesPage.tsx` + matching `api/`/`types/` modules); `FuelPage.tsx` at
-`/fuel` (nav entry between Maintenance and Car Docs) is copied directly from
-`MaintenancePage.tsx`'s modal-form/data-table/view-modal structure, and
-`LeasesPage.tsx` at `/leases` (nav entry between Cars and Vendors)
-is likewise copied from `FuelPage.tsx`'s structure, with one addition: its
-view modal fetches `GET /leases/{id}/due-payments` on open and renders
-a small "Payment status" section (`due_months`/`generated_months`) with a
-"Generate due payments" button when `due_months` is non-empty — a light
-addition inside the existing view-modal shell, not a new page section, same
-restraint as `CarDocsPage.tsx`'s `.expired` styling below. Its create form
-only lets `car_id`/`vendor_id` be chosen when creating a new lease
-(`editingId` is falsy); editing an existing one shows them as read-only text
-instead, since `LeaseUpdate` on the backend doesn't accept those two
-fields — reassigning a car to a different vendor means ending the current
-lease and creating a new one, not editing one in place. **Naming history:**
-this page/route/API-module/nav-entry were originally named "Enrollment"
-(`EnrollmentsPage.tsx`, `/enrollments`, `api/enrollments.ts`,
-`types/enrollment.ts`) and renamed to "Lease" shortly after shipping — see
-"Project state" — so don't be surprised if an old branch or discussion
-still says "Enrollment"; the current code and this doc use "Lease"
-throughout.
+layout. `FuelPage.tsx` at `/fuel` (nav entry between Maintenance and Car
+Docs) is copied directly from `MaintenancePage.tsx`'s modal-form/data-table/
+view-modal structure, and `LeasesPage.tsx` at `/leases` (nav entry between
+Cars and Vendors) is copied from `FuelPage.tsx`'s structure, with one
+addition: its view modal fetches `GET /leases/{id}/due-payments` on open
+and renders a small "Payment status" section (`due_months`/
+`generated_months`) with a "Generate due payments" button when
+`due_months` is non-empty — a light addition inside the existing
+view-modal shell, not a new page section. Its create form only lets
+`car_id`/`vendor_id` be chosen when creating a new lease (`editingId` is
+falsy); editing an existing one shows them as read-only text instead,
+since `LeaseUpdate` on the backend doesn't accept those two fields —
+reassigning a car to a different vendor means ending the current lease and
+creating a new one, not editing one in place. (This page/route/module was
+originally named "Enrollment" — see `docs/decisions.md`.)
+
 Revenue is the one exception, since it's a read-only dashboard rather than
 a CRUD resource: it's `src/pages/DashboardPage.tsx` (mounted at the
 existing `/dashboard` route/nav entry, not a new `/revenue` route) +
@@ -462,55 +388,49 @@ create button, since there's nothing to create.
   `<span className="form-field-label">` (the field's name, e.g. `Owner`,
   plus `(optional)` appended for non-required fields) followed by the
   input/select/textarea — a visible label on the left, the control on the
-  right (shared `.form-field`/`.form-field-label` classes in `App.css`).
-  Wrapping the control in `<label>` gives it its accessible name natively,
-  so no separate `aria-label` is needed. `placeholder` is reserved for a
-  format example on top of the label (e.g. `e.g. 1500.00` on a cost/amount
-  field), not as a stand-in for the label itself — don't go back to
-  placeholder-only fields with no visible label (that read as ambiguous
-  once a select showed "Unassigned" or a number field showed a filled-in
-  default with nothing beside it explaining what it was; fixed across
-  every feature's create/edit modal in one pass, user's explicit call).
-  `AuthForm.css`'s login/register forms predate this convention and use
-  their own visible-label markup; don't backport this exact `.form-field`
-  structure onto those two pages without being asked, but they already
-  satisfy the same "field must have a visible label" intent. Footer
-  actions use the shared `.modal-actions` class
-  (`justify-content: space-between`):
-  **Cancel/Close bottom-left**, primary action (`.btn-primary`)
-  **bottom-right**. A read-only "view" modal (opened from the table's
-  `ViewIcon`) reuses the same `.modal-backdrop`/`.modal-panel.card` shell
-  with a `<dl className="detail-list">` (shared in `App.css`) instead of
-  form inputs — see `CarOwnersPage.tsx`'s `viewingOwner` modal.
+  right. Wrapping the control in `<label>` gives it its accessible name
+  natively, so no separate `aria-label` is needed. `placeholder` is
+  reserved for a format example on top of the label (e.g. `e.g. 1500.00`
+  on a cost/amount field), not as a stand-in for the label itself — don't
+  go back to placeholder-only fields with no visible label (see
+  `docs/decisions.md` for why this was fixed across every feature in one
+  pass). `AuthForm.css`'s login/register forms predate this convention and
+  use their own visible-label markup; don't backport this exact
+  `.form-field` structure onto those two pages without being asked, but
+  they already satisfy the same "field must have a visible label" intent.
+  Footer actions use the shared `.modal-actions` class
+  (`justify-content: space-between`): **Cancel/Close bottom-left**,
+  primary action (`.btn-primary`) **bottom-right**. A read-only "view"
+  modal (opened from the table's `ViewIcon`) reuses the same
+  `.modal-backdrop`/`.modal-panel.card` shell with a
+  `<dl className="detail-list">` instead of form inputs — see
+  `CarOwnersPage.tsx`'s `viewingOwner` modal.
 - `.modal-panel` also styles bare `select`/`textarea` elements the same as
   `input` (added for Vendor/Driver's `address` textarea and Car's
-  owner/driver `select`s) — reuse these rather than styling a
-  one-off. For a feature whose form needs to pick another feature's record
-  (like Car picking a Car Owner/Driver, or Lease picking a Car/Vendor),
-  fetch that sibling feature's list in the same page-load `Promise.all` as
-  the page's own list (see `CarsPage.tsx`), use it to populate the
-  `<select>` options in the form, and reuse it again to resolve id → name
-  for display in the table and view modal (there's no expanded/joined read
-  from the API — `CarRead` only carries the raw FK ids). Car specifically
-  is picked by five sibling features (Maintenance, Car Docs, Payments,
-  Fuel, Leases), all of which display it via the shared
-  `carDisplayLabel(car)` helper exported from `src/types/car.ts` — brand +
-  model, plus the last 4 digits of `registration_number` in parens when
-  present (e.g. `Toyota Corolla (4321)`), so cars sharing a brand/model are
-  still easy to tell apart in a select or table. This is the one
-  cross-page-shared (not copy-pasted-per-page) display helper in the
-  frontend, since it has 10 call sites across 5 files and a single source
-  of truth was worth it; don't reintroduce a local per-page
-  `${car.brand} ${car.model_name ?? ''}` duplicate — import and use
-  `carDisplayLabel` instead. Each of those 5 pages' own local
-  `carLabel(carId)` helper still does the `cars.find` id lookup, then
-  delegates formatting to `carDisplayLabel`. `CarsPage.tsx`'s own
+  owner/driver `select`s) — reuse these rather than styling a one-off. For
+  a feature whose form needs to pick another feature's record (like Car
+  picking a Car Owner/Driver, or Lease picking a Car/Vendor), fetch that
+  sibling feature's list in the same page-load `Promise.all` as the page's
+  own list (see `CarsPage.tsx`), use it to populate the `<select>` options
+  in the form, and reuse it again to resolve id → name for display in the
+  table and view modal (there's no expanded/joined read from the API —
+  `CarRead` only carries the raw FK ids). Car specifically is picked by
+  five sibling features (Maintenance, Car Docs, Payments, Fuel, Leases),
+  all of which display it via the shared `carDisplayLabel(car)` helper
+  exported from `src/types/car.ts` — brand + model, plus the last 4 digits
+  of `registration_number` in parens when present (e.g.
+  `Toyota Corolla (4321)`). This is the one cross-page-shared (not
+  copy-pasted-per-page) display helper in the frontend — don't reintroduce
+  a local per-page `${car.brand} ${car.model_name ?? ''}` duplicate;
+  import and use `carDisplayLabel` instead. Each of those 5 pages' own
+  local `carLabel(carId)` helper still does the `cars.find` id lookup,
+  then delegates formatting to `carDisplayLabel`. `CarsPage.tsx`'s own
   `vendorName(carId)` helper (no `Vendor` FK left on `Car` to look up
   directly) instead finds the active lease for that car id in a
   `listLeases({ active: true })` list fetched alongside cars/owners/
-  vendors/drivers, then resolves that lease's `vendor_id` to a name —
-  the one car-related lookup here that goes through a second sibling
-  feature (Lease) rather than a direct FK on `Car`.
+  vendors/drivers, then resolves that lease's `vendor_id` to a name — the
+  one car-related lookup here that goes through a second sibling feature
+  (Lease) rather than a direct FK on `Car`.
 - `NavIcons.tsx` holds every icon as a small inline-SVG component built
   from the shared `iconProps()` helper (24×24 viewBox, `stroke="currentColor"`,
   `strokeWidth="1.5"`) — add new icons here (e.g. `PlusIcon`) rather than
@@ -538,26 +458,23 @@ create button, since there's nothing to create.
   validation now requiring it for `monthly_fair`; the manual `Amount`
   `<input>` is hidden outright (not shown read-only) whenever `type ===
   'monthly_fair'`, since `PaymentService` derives and overwrites `amount`
-  from the linked Lease server-side regardless of what's submitted —
-  user's explicit call, don't reintroduce it without asking.
+  from the linked Lease server-side regardless of what's submitted — don't
+  reintroduce it without asking.
 - `CarDocsPage.tsx` colors an already-past `expiry_date` cell with
   `.expired` (`var(--status-critical)`, defined in the page's own CSS
   file rather than `App.css` since no other feature needs it yet) — a
   light touch on top of the standard table, not a full "expiring soon"
   filter/reminder system (that's flagged as suggested-not-required in
   `06-car-docs.md`; ask before building it out further).
-- `DashboardPage.tsx` (the Revenue dashboard) has **no chart library
-  dependency** — `package.json` intentionally stays at
-  `react`/`react-router-dom`/`zustand` only, so the by-type donut and
-  by-period grouped bar chart are hand-rolled inline SVG (`<circle
-  strokeDasharray>` arcs for the donut, `<rect>` bars for the bar chart),
-  colored from the categorical palette in
-  `.claude/skills` → dataviz's `references/palette.md` (validated via that
-  skill's `scripts/validate_palette.js`) rather than the app's single
-  `--accent` token, since this is the app's first multi-series
-  visualization. If a future feature needs another chart, reuse this
-  hand-rolled-SVG approach rather than introducing a chart library without
-  checking with the user first.
+- `DashboardPage.tsx` has **no chart library dependency** — the by-type
+  donut and by-period grouped bar chart are hand-rolled inline SVG
+  (`<circle strokeDasharray>` arcs for the donut, `<rect>` bars for the bar
+  chart), colored from the categorical palette in `.claude/skills` →
+  dataviz's `references/palette.md` (validated via that skill's
+  `scripts/validate_palette.js`) rather than the app's single `--accent`
+  token. See `docs/decisions.md` for why; if a future feature needs
+  another chart, reuse this approach rather than introducing a chart
+  library without checking with the user first.
 
 ## What this project is
 

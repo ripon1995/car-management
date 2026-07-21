@@ -9,10 +9,10 @@ from sqlalchemy.sql import func
 from app.db.base import Base
 
 
-class Enrollment(Base):
+class Lease(Base):
     """A dated car<->vendor lease period. `end_date is None` means currently active."""
 
-    __tablename__ = "enrollments"
+    __tablename__ = "leases"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     car_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("cars.id"), nullable=False)

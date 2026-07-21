@@ -8,7 +8,7 @@ import RegisterPage from './pages/RegisterPage'
 import DashboardPage from './pages/DashboardPage'
 import CarOwnersPage from './pages/CarOwnersPage'
 import CarsPage from './pages/CarsPage'
-import EnrollmentsPage from './pages/EnrollmentsPage'
+import LeasesPage from './pages/LeasesPage'
 import VendorsPage from './pages/VendorsPage'
 import DriversPage from './pages/DriversPage'
 import MaintenancePage from './pages/MaintenancePage'
@@ -59,10 +59,10 @@ function App() {
               }
             />
             <Route
-              path="/enrollments"
+              path="/leases"
               element={
                 <ProtectedRoute>
-                  <EnrollmentsPage />
+                  <LeasesPage />
                 </ProtectedRoute>
               }
             />

@@ -26,19 +26,20 @@ is **not** a field on Car — see "Relationships" below.
 - `driver_id` → one Driver can currently be assigned to many Cars (or
   enforce 1:1 at the application layer if a driver should only run one car).
 - **No `vendor_id`.** A car's vendor relationship is dated (a lease has a
-  start, and often an end), so it's tracked by the separate Enrollment
-  feature (`app/features/enrollments/`, no numbered doc — see `CLAUDE.md`)
-  rather than a bare current-assignment FK on `cars`. A car's *current*
-  vendor, if any, is whichever Enrollment references this `car_id` with
-  `end_date IS NULL`. This was originally a bare `vendor_id` FK (see git
-  history / migrations `0005`, `0013`–`0014`) and was replaced once it
-  became clear cars go through repeated lease/return cycles with gaps
-  between them that must not accrue fare.
+  start, and often an end), so it's tracked by the separate Lease
+  feature (`app/features/leases/`, no numbered doc — see `CLAUDE.md`;
+  briefly called "Enrollment" before being renamed) rather than a bare
+  current-assignment FK on `cars`. A car's *current* vendor, if any, is
+  whichever Lease references this `car_id` with `end_date IS NULL`. This
+  was originally a bare `vendor_id` FK (see git history / migrations
+  `0005`, `0013`–`0014`) and was replaced once it became clear cars go
+  through repeated lease/return cycles with gaps between them that must
+  not accrue fare.
 - `driver_id` still has the same **(assumption)** as before: it only
   captures the *current* assignment. If history of past driver assignments
   per car is needed, a separate table would be needed — not built here;
   flag if this matters. (Vendor assignment history is already covered by
-  Enrollment.)
+  Lease.)
 
 ## API Endpoints
 All endpoints require authentication (see [Auth](09-auth.md)); any
@@ -46,7 +47,7 @@ logged-in user can manage any car.
 - `GET /api/v1/cars` — list (not yet implemented: pagination/filtering by
   `owner_id`/`driver_id`/`brand` — currently returns all rows, matching
   [Car Owner](04-car-owner.md)'s current state). To find a car's current
-  vendor, query `GET /enrollments?car_id={id}&active=true` separately.
+  vendor, query `GET /leases?car_id={id}&active=true` separately.
 - `POST /api/v1/cars`
 - `GET /api/v1/cars/{id}` — retrieve; returns the raw FK ids only, no
   expanded owner/driver summaries (the frontend resolves id → name
@@ -65,5 +66,5 @@ logged-in user can manage any car.
   existing row, checked against the respective feature's repository
   (`NotFoundException` otherwise) — `CarService` takes the Car Owner and
   Driver repositories as constructor dependencies for this.
-- Deleting a Car referenced by Maintenance/CarDocs/Payment/Fuel/Enrollment
+- Deleting a Car referenced by Maintenance/CarDocs/Payment/Fuel/Lease
   records is restricted (`ConflictException`), not cascaded.

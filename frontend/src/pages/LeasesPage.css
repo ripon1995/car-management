@@ -1,25 +1,25 @@
-.enrollments-page {
+.leases-page {
   align-items: stretch;
   text-align: left;
   width: 100%;
 }
 
-.enrollments-page .active {
+.leases-page .active {
   color: var(--status-good);
   font-weight: 600;
 }
 
-.enrollments-page .payment-status {
+.leases-page .payment-status {
   margin-top: 1rem;
   padding-top: 1rem;
   border-top: 1px solid var(--border);
 }
 
-.enrollments-page .payment-status h3 {
+.leases-page .payment-status h3 {
   margin: 0 0 0.5rem;
   font-size: 0.95rem;
 }
 
-.enrollments-page .payment-status p {
+.leases-page .payment-status p {
   margin: 0 0 0.5rem;
 }

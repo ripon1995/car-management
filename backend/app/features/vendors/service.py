@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import ConflictException, NotFoundException
 from app.db.session import get_db
-from app.features.enrollments.models import Enrollment
+from app.features.leases.models import Lease
 from app.features.vendors.models import Vendor
 from app.features.vendors.repository import VendorRepository
 from app.features.vendors.schemas import VendorCreate, VendorUpdate
@@ -38,10 +38,10 @@ class VendorService:
     async def delete(self, vendor_id: uuid.UUID) -> None:
         vendor = await self.get_by_id(vendor_id)
         referenced = await self.repository.db.scalar(
-            select(Enrollment.id).where(Enrollment.vendor_id == vendor_id).limit(1)
+            select(Lease.id).where(Lease.vendor_id == vendor_id).limit(1)
         )
         if referenced is not None:
-            raise ConflictException("Cannot delete a vendor referenced by one or more enrollments")
+            raise ConflictException("Cannot delete a vendor referenced by one or more leases")
         await self.repository.delete(vendor)
 
 

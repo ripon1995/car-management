@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { EnrollmentIcon, PlusIcon, ViewIcon, EditIcon, DeleteIcon } from '../components/NavIcons'
+import { LeaseIcon, PlusIcon, ViewIcon, EditIcon, DeleteIcon } from '../components/NavIcons'
 import ErrorDialog from '../components/ErrorDialog'
 import { ApiError } from '../errors/api'
 import * as api from '../api'
-import type { Enrollment, EnrollmentInput, DuePayments } from '../types/enrollment'
+import type { Lease, LeaseInput, DuePayments } from '../types/lease'
 import { carDisplayLabel, type Car } from '../types/car'
 import type { Vendor } from '../types/vendor'
-import './EnrollmentsPage.css'
+import './LeasesPage.css'
 
-const emptyForm: EnrollmentInput = {
+const emptyForm: LeaseInput = {
   car_id: '',
   vendor_id: '',
   monthly_fare: 0,
@@ -20,17 +20,17 @@ function toApiError(err: unknown): ApiError {
   return err instanceof ApiError ? err : new ApiError(0, 'Something went wrong', 'Something went wrong')
 }
 
-function EnrollmentsPage() {
-  const [enrollments, setEnrollments] = useState<Enrollment[]>([])
+function LeasesPage() {
+  const [leases, setLeases] = useState<Lease[]>([])
   const [cars, setCars] = useState<Car[]>([])
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<ApiError | null>(null)
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [form, setForm] = useState<EnrollmentInput>(emptyForm)
+  const [form, setForm] = useState<LeaseInput>(emptyForm)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [viewingEnrollment, setViewingEnrollment] = useState<Enrollment | null>(null)
+  const [viewingLease, setViewingLease] = useState<Lease | null>(null)
   const [dueStatus, setDueStatus] = useState<DuePayments | null>(null)
   const [isDueLoading, setIsDueLoading] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
@@ -39,10 +39,10 @@ function EnrollmentsPage() {
   useEffect(() => {
     let cancelled = false
     setIsLoading(true)
-    Promise.all([api.listEnrollments(), api.listCars(), api.listVendors()])
-      .then(([enrollmentsData, carsData, vendorsData]) => {
+    Promise.all([api.listLeases(), api.listCars(), api.listVendors()])
+      .then(([leasesData, carsData, vendorsData]) => {
         if (cancelled) return
-        setEnrollments(enrollmentsData)
+        setLeases(leasesData)
         setCars(carsData)
         setVendors(vendorsData)
       })
@@ -66,8 +66,8 @@ function EnrollmentsPage() {
     return vendors.find((v) => v.id === vendorId)?.name ?? '—'
   }
 
-  function recordLabel(enrollment: Enrollment) {
-    return `${carLabel(enrollment.car_id)} — ${vendorLabel(enrollment.vendor_id)}`
+  function recordLabel(lease: Lease) {
+    return `${carLabel(lease.car_id)} — ${vendorLabel(lease.vendor_id)}`
   }
 
   function openCreateForm() {
@@ -76,15 +76,15 @@ function EnrollmentsPage() {
     setIsFormOpen(true)
   }
 
-  function openEditForm(enrollment: Enrollment) {
-    setViewingEnrollment(null)
-    setEditingId(enrollment.id)
+  function openEditForm(lease: Lease) {
+    setViewingLease(null)
+    setEditingId(lease.id)
     setForm({
-      car_id: enrollment.car_id,
-      vendor_id: enrollment.vendor_id,
-      monthly_fare: enrollment.monthly_fare,
-      start_date: enrollment.start_date,
-      end_date: enrollment.end_date,
+      car_id: lease.car_id,
+      vendor_id: lease.vendor_id,
+      monthly_fare: lease.monthly_fare,
+      start_date: lease.start_date,
+      end_date: lease.end_date,
     })
     setIsFormOpen(true)
   }
@@ -107,20 +107,20 @@ function EnrollmentsPage() {
   }, [isFormOpen, editingId])
 
   useEffect(() => {
-    if (!viewingEnrollment) {
+    if (!viewingLease) {
       setDueStatus(null)
       return
     }
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') setViewingEnrollment(null)
+      if (event.key === 'Escape') setViewingLease(null)
     }
     document.addEventListener('keydown', handleKeyDown)
 
     let cancelled = false
     setIsDueLoading(true)
     api
-      .getDuePayments(viewingEnrollment.id)
+      .getDuePayments(viewingLease.id)
       .then((data) => {
         if (!cancelled) setDueStatus(data)
       })
@@ -135,23 +135,23 @@ function EnrollmentsPage() {
       cancelled = true
       document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [viewingEnrollment])
+  }, [viewingLease])
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
     setIsSubmitting(true)
     try {
       if (editingId) {
-        const updated = await api.updateEnrollment(editingId, {
+        const updated = await api.updateLease(editingId, {
           monthly_fare: form.monthly_fare,
           start_date: form.start_date,
           end_date: form.end_date || null,
         })
-        setEnrollments((prev) => prev.map((e) => (e.id === editingId ? updated : e)))
+        setLeases((prev) => prev.map((l) => (l.id === editingId ? updated : l)))
       } else {
-        const payload: EnrollmentInput = { ...form, end_date: form.end_date || null }
-        const created = await api.createEnrollment(payload)
-        setEnrollments((prev) => [...prev, created])
+        const payload: LeaseInput = { ...form, end_date: form.end_date || null }
+        const created = await api.createLease(payload)
+        setLeases((prev) => [...prev, created])
       }
       closeForm()
     } catch (err) {
@@ -161,22 +161,22 @@ function EnrollmentsPage() {
     }
   }
 
-  async function handleDelete(enrollment: Enrollment) {
-    if (!window.confirm(`Delete enrollment "${recordLabel(enrollment)}"?`)) return
+  async function handleDelete(lease: Lease) {
+    if (!window.confirm(`Delete lease "${recordLabel(lease)}"?`)) return
     try {
-      await api.deleteEnrollment(enrollment.id)
-      setEnrollments((prev) => prev.filter((existing) => existing.id !== enrollment.id))
+      await api.deleteLease(lease.id)
+      setLeases((prev) => prev.filter((existing) => existing.id !== lease.id))
     } catch (err) {
       setError(toApiError(err))
     }
   }
 
   async function handleGenerate() {
-    if (!viewingEnrollment) return
+    if (!viewingLease) return
     setIsGenerating(true)
     try {
-      await api.generateDuePayments(viewingEnrollment.id)
-      const refreshed = await api.getDuePayments(viewingEnrollment.id)
+      await api.generateDuePayments(viewingLease.id)
+      const refreshed = await api.getDuePayments(viewingLease.id)
       setDueStatus(refreshed)
     } catch (err) {
       setError(toApiError(err))
@@ -186,17 +186,17 @@ function EnrollmentsPage() {
   }
 
   return (
-    <main id="content" className="enrollments-page">
+    <main id="content" className="leases-page">
       <div className="page-header">
         <h1 className="page-title">
           <span className="app-nav-icon">
-            <EnrollmentIcon />
+            <LeaseIcon />
           </span>
-          Enrollments
+          Leases
         </h1>
         <button type="button" className="btn-primary" onClick={openCreateForm}>
           <PlusIcon />
-          Add enrollment
+          Add lease
         </button>
       </div>
 
@@ -206,11 +206,11 @@ function EnrollmentsPage() {
             className="modal-panel card"
             role="dialog"
             aria-modal="true"
-            aria-labelledby="enrollment-form-title"
+            aria-labelledby="lease-form-title"
             onClick={(event) => event.stopPropagation()}
             onSubmit={handleSubmit}
           >
-            <h2 id="enrollment-form-title">{editingId ? 'Edit enrollment' : 'New enrollment'}</h2>
+            <h2 id="lease-form-title">{editingId ? 'Edit lease' : 'New lease'}</h2>
             {editingId ? (
               <>
                 <label className="form-field">
@@ -310,50 +310,50 @@ function EnrollmentsPage() {
         </div>
       )}
 
-      {viewingEnrollment && (
-        <div className="modal-backdrop" onClick={() => setViewingEnrollment(null)}>
+      {viewingLease && (
+        <div className="modal-backdrop" onClick={() => setViewingLease(null)}>
           <div
             className="modal-panel card"
             role="dialog"
             aria-modal="true"
-            aria-labelledby="enrollment-view-title"
+            aria-labelledby="lease-view-title"
             onClick={(event) => event.stopPropagation()}
           >
-            <h2 id="enrollment-view-title">{recordLabel(viewingEnrollment)}</h2>
+            <h2 id="lease-view-title">{recordLabel(viewingLease)}</h2>
             <dl className="detail-list">
               <div>
                 <dt>Car</dt>
-                <dd>{carLabel(viewingEnrollment.car_id)}</dd>
+                <dd>{carLabel(viewingLease.car_id)}</dd>
               </div>
               <div>
                 <dt>Vendor</dt>
-                <dd>{vendorLabel(viewingEnrollment.vendor_id)}</dd>
+                <dd>{vendorLabel(viewingLease.vendor_id)}</dd>
               </div>
               <div>
                 <dt>Monthly fare</dt>
-                <dd>{viewingEnrollment.monthly_fare}</dd>
+                <dd>{viewingLease.monthly_fare}</dd>
               </div>
               <div>
                 <dt>Start date</dt>
-                <dd>{viewingEnrollment.start_date}</dd>
+                <dd>{viewingLease.start_date}</dd>
               </div>
               <div>
                 <dt>End date</dt>
-                <dd>{viewingEnrollment.end_date ?? '—'}</dd>
+                <dd>{viewingLease.end_date ?? '—'}</dd>
               </div>
               <div>
                 <dt>Status</dt>
-                <dd className={viewingEnrollment.end_date ? '' : 'active'}>
-                  {viewingEnrollment.end_date ? 'Ended' : 'Active'}
+                <dd className={viewingLease.end_date ? '' : 'active'}>
+                  {viewingLease.end_date ? 'Ended' : 'Active'}
                 </dd>
               </div>
               <div>
                 <dt>Created</dt>
-                <dd>{new Date(viewingEnrollment.created_at).toLocaleString()}</dd>
+                <dd>{new Date(viewingLease.created_at).toLocaleString()}</dd>
               </div>
               <div>
                 <dt>Last updated</dt>
-                <dd>{new Date(viewingEnrollment.updated_at).toLocaleString()}</dd>
+                <dd>{new Date(viewingLease.updated_at).toLocaleString()}</dd>
               </div>
             </dl>
             <div className="payment-status">
@@ -380,13 +380,13 @@ function EnrollmentsPage() {
               ) : null}
             </div>
             <div className="modal-actions">
-              <button type="button" className="secondary" onClick={() => setViewingEnrollment(null)}>
+              <button type="button" className="secondary" onClick={() => setViewingLease(null)}>
                 Close
               </button>
               <button
                 type="button"
                 className="btn-primary"
-                onClick={() => openEditForm(viewingEnrollment)}
+                onClick={() => openEditForm(viewingLease)}
               >
                 Edit
               </button>
@@ -397,8 +397,8 @@ function EnrollmentsPage() {
 
       {isLoading ? (
         <p>Loading…</p>
-      ) : enrollments.length === 0 ? (
-        <p>No enrollments yet.</p>
+      ) : leases.length === 0 ? (
+        <p>No leases yet.</p>
       ) : (
         <div className="data-table-wrap card">
           <table className="data-table">
@@ -415,42 +415,42 @@ function EnrollmentsPage() {
               </tr>
             </thead>
             <tbody>
-              {enrollments.map((enrollment, index) => (
-                <tr key={enrollment.id}>
+              {leases.map((lease, index) => (
+                <tr key={lease.id}>
                   <td>{index + 1}</td>
-                  <td>{carLabel(enrollment.car_id)}</td>
-                  <td>{vendorLabel(enrollment.vendor_id)}</td>
-                  <td>{enrollment.monthly_fare}</td>
-                  <td>{enrollment.start_date}</td>
-                  <td>{enrollment.end_date ?? '—'}</td>
-                  <td className={enrollment.end_date ? '' : 'active'}>
-                    {enrollment.end_date ? 'Ended' : 'Active'}
+                  <td>{carLabel(lease.car_id)}</td>
+                  <td>{vendorLabel(lease.vendor_id)}</td>
+                  <td>{lease.monthly_fare}</td>
+                  <td>{lease.start_date}</td>
+                  <td>{lease.end_date ?? '—'}</td>
+                  <td className={lease.end_date ? '' : 'active'}>
+                    {lease.end_date ? 'Ended' : 'Active'}
                   </td>
                   <td className="data-table-actions">
                     <button
                       type="button"
                       className="icon-btn"
-                      aria-label={`View ${recordLabel(enrollment)}`}
+                      aria-label={`View ${recordLabel(lease)}`}
                       title="View"
-                      onClick={() => setViewingEnrollment(enrollment)}
+                      onClick={() => setViewingLease(lease)}
                     >
                       <ViewIcon />
                     </button>
                     <button
                       type="button"
                       className="icon-btn"
-                      aria-label={`Edit ${recordLabel(enrollment)}`}
+                      aria-label={`Edit ${recordLabel(lease)}`}
                       title="Edit"
-                      onClick={() => openEditForm(enrollment)}
+                      onClick={() => openEditForm(lease)}
                     >
                       <EditIcon />
                     </button>
                     <button
                       type="button"
                       className="icon-btn danger"
-                      aria-label={`Delete ${recordLabel(enrollment)}`}
+                      aria-label={`Delete ${recordLabel(lease)}`}
                       title="Delete"
-                      onClick={() => handleDelete(enrollment)}
+                      onClick={() => handleDelete(lease)}
                     >
                       <DeleteIcon />
                     </button>
@@ -467,4 +467,4 @@ function EnrollmentsPage() {
   )
 }
 
-export default EnrollmentsPage
+export default LeasesPage

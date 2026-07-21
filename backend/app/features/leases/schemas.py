@@ -5,7 +5,7 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict
 
 
-class EnrollmentCreate(BaseModel):
+class LeaseCreate(BaseModel):
     car_id: uuid.UUID
     vendor_id: uuid.UUID
     monthly_fare: Decimal
@@ -13,13 +13,13 @@ class EnrollmentCreate(BaseModel):
     end_date: date | None = None
 
 
-class EnrollmentUpdate(BaseModel):
+class LeaseUpdate(BaseModel):
     monthly_fare: Decimal | None = None
     start_date: date | None = None
     end_date: date | None = None
 
 
-class EnrollmentRead(BaseModel):
+class LeaseRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID

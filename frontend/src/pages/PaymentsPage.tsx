@@ -8,7 +8,7 @@ import { carDisplayLabel, type Car } from '../types/car'
 import type { MaintenanceRecord } from '../types/maintenance'
 import type { CarDoc } from '../types/carDoc'
 import type { FuelRecord } from '../types/fuel'
-import type { Enrollment } from '../types/enrollment'
+import type { Lease } from '../types/lease'
 import type { Vendor } from '../types/vendor'
 import './PaymentsPage.css'
 
@@ -62,7 +62,7 @@ const emptyForm: PaymentInput = {
   associated_maintenance: null,
   associated_cardocs: null,
   associated_fuel: null,
-  associated_enrollment: null,
+  associated_lease: null,
   car_id: '',
   amount: 0,
   payment_date: todayIso,
@@ -81,7 +81,7 @@ function PaymentsPage() {
   const [maintenanceRecords, setMaintenanceRecords] = useState<MaintenanceRecord[]>([])
   const [carDocs, setCarDocs] = useState<CarDoc[]>([])
   const [fuelRecords, setFuelRecords] = useState<FuelRecord[]>([])
-  const [enrollments, setEnrollments] = useState<Enrollment[]>([])
+  const [leases, setLeases] = useState<Lease[]>([])
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<ApiError | null>(null)
@@ -101,17 +101,17 @@ function PaymentsPage() {
       api.listMaintenance(),
       api.listCarDocs(),
       api.listFuelRecords(),
-      api.listEnrollments(),
+      api.listLeases(),
       api.listVendors(),
     ])
-      .then(([paymentsData, carsData, maintenanceData, carDocsData, fuelData, enrollmentsData, vendorsData]) => {
+      .then(([paymentsData, carsData, maintenanceData, carDocsData, fuelData, leasesData, vendorsData]) => {
         if (cancelled) return
         setPayments(paymentsData)
         setCars(carsData)
         setMaintenanceRecords(maintenanceData)
         setCarDocs(carDocsData)
         setFuelRecords(fuelData)
-        setEnrollments(enrollmentsData)
+        setLeases(leasesData)
         setVendors(vendorsData)
       })
       .catch((err) => {
@@ -149,15 +149,15 @@ function PaymentsPage() {
     return record ? fuelRecordLabel(record) : '—'
   }
 
-  function enrollmentRecordLabel(enrollment: Enrollment) {
-    const vendorName = vendors.find((v) => v.id === enrollment.vendor_id)?.name ?? 'Unknown vendor'
-    return `${vendorName} — ${enrollment.monthly_fare}/mo`
+  function leaseRecordLabel(lease: Lease) {
+    const vendorName = vendors.find((v) => v.id === lease.vendor_id)?.name ?? 'Unknown vendor'
+    return `${vendorName} — ${lease.monthly_fare}/mo`
   }
 
-  function enrollmentLabel(id: string | null) {
+  function leaseLabel(id: string | null) {
     if (!id) return '—'
-    const enrollment = enrollments.find((e) => e.id === id)
-    return enrollment ? enrollmentRecordLabel(enrollment) : '—'
+    const lease = leases.find((l) => l.id === id)
+    return lease ? leaseRecordLabel(lease) : '—'
   }
 
   function openCreateForm() {
@@ -174,7 +174,7 @@ function PaymentsPage() {
       associated_maintenance: payment.associated_maintenance,
       associated_cardocs: payment.associated_cardocs,
       associated_fuel: payment.associated_fuel,
-      associated_enrollment: payment.associated_enrollment,
+      associated_lease: payment.associated_lease,
       car_id: payment.car_id,
       amount: payment.amount,
       payment_date: payment.payment_date,
@@ -219,20 +219,20 @@ function PaymentsPage() {
       associated_maintenance: type === 'service' ? f.associated_maintenance : null,
       associated_cardocs: type === 'document' ? f.associated_cardocs : null,
       associated_fuel: type === 'fuel' ? f.associated_fuel : null,
-      associated_enrollment: type === 'monthly_fair' ? f.associated_enrollment : null,
+      associated_lease: type === 'monthly_fair' ? f.associated_lease : null,
     }))
   }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
     setIsSubmitting(true)
-    const linkedEnrollment =
+    const linkedLease =
       form.type === 'monthly_fair'
-        ? enrollments.find((e) => e.id === form.associated_enrollment)
+        ? leases.find((l) => l.id === form.associated_lease)
         : null
     const payload: PaymentInput = {
       ...form,
-      amount: linkedEnrollment ? linkedEnrollment.monthly_fare : form.amount,
+      amount: linkedLease ? linkedLease.monthly_fare : form.amount,
       description: form.description || null,
     }
     try {
@@ -268,9 +268,9 @@ function PaymentsPage() {
   const fuelOptions = form.car_id
     ? fuelRecords.filter((record) => record.car_id === form.car_id)
     : fuelRecords
-  const enrollmentOptions = form.car_id
-    ? enrollments.filter((enrollment) => enrollment.car_id === form.car_id)
-    : enrollments
+  const leaseOptions = form.car_id
+    ? leases.filter((lease) => lease.car_id === form.car_id)
+    : leases
 
   return (
     <main id="content" className="payments-page">
@@ -385,20 +385,20 @@ function PaymentsPage() {
             )}
             {form.type === 'monthly_fair' && (
               <label className="form-field">
-                <span className="form-field-label">Linked enrollment</span>
+                <span className="form-field-label">Linked lease</span>
                 <select
-                  value={form.associated_enrollment ?? ''}
+                  value={form.associated_lease ?? ''}
                   onChange={(event) =>
-                    setForm((f) => ({ ...f, associated_enrollment: event.target.value || null }))
+                    setForm((f) => ({ ...f, associated_lease: event.target.value || null }))
                   }
                   required
                 >
                   <option value="" disabled>
-                    Select enrollment
+                    Select lease
                   </option>
-                  {enrollmentOptions.map((enrollment) => (
-                    <option key={enrollment.id} value={enrollment.id}>
-                      {enrollmentRecordLabel(enrollment)}
+                  {leaseOptions.map((lease) => (
+                    <option key={lease.id} value={lease.id}>
+                      {leaseRecordLabel(lease)}
                     </option>
                   ))}
                 </select>
@@ -512,8 +512,8 @@ function PaymentsPage() {
               )}
               {viewingPayment.type === 'monthly_fair' && (
                 <div>
-                  <dt>Linked enrollment</dt>
-                  <dd>{enrollmentLabel(viewingPayment.associated_enrollment)}</dd>
+                  <dt>Linked lease</dt>
+                  <dd>{leaseLabel(viewingPayment.associated_lease)}</dd>
                 </div>
               )}
               <div>

@@ -1,4 +1,4 @@
-export interface Enrollment {
+export interface Lease {
   id: string
   car_id: string
   vendor_id: string
@@ -9,7 +9,7 @@ export interface Enrollment {
   updated_at: string
 }
 
-export interface EnrollmentInput {
+export interface LeaseInput {
   car_id: string
   vendor_id: string
   monthly_fare: number

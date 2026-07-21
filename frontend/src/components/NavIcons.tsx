@@ -45,7 +45,7 @@ export function CarsIcon() {
   )
 }
 
-export function EnrollmentIcon() {
+export function LeaseIcon() {
   return (
     <svg {...iconProps()}>
       <rect x="3.5" y="4.5" width="17" height="16" rx="1.5" stroke="currentColor" strokeWidth="1.5" />

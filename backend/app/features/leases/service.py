@@ -10,9 +10,9 @@ from app.core.exceptions import ConflictException, NotFoundException, Validation
 from app.db.session import get_db
 from app.features.car_owners.repository import CarOwnerRepository
 from app.features.cars.repository import CarRepository
-from app.features.enrollments.models import Enrollment
-from app.features.enrollments.repository import EnrollmentRepository
-from app.features.enrollments.schemas import DuePaymentsRead, EnrollmentCreate, EnrollmentUpdate
+from app.features.leases.models import Lease
+from app.features.leases.repository import LeaseRepository
+from app.features.leases.schemas import DuePaymentsRead, LeaseCreate, LeaseUpdate
 from app.features.payments.repository import PaymentRepository
 from app.features.vendors.repository import VendorRepository
 
@@ -29,12 +29,12 @@ def _month_range(start: date, end: date) -> list[str]:
     return months
 
 
-class EnrollmentService:
-    """Business logic for creating/managing car<->vendor enrollments."""
+class LeaseService:
+    """Business logic for creating/managing car<->vendor leases."""
 
     def __init__(
         self,
-        repository: EnrollmentRepository,
+        repository: LeaseRepository,
         car_repository: CarRepository,
         vendor_repository: VendorRepository,
         car_owner_repository: CarOwnerRepository,
@@ -46,11 +46,11 @@ class EnrollmentService:
         self.car_owner_repository = car_owner_repository
         self.payment_repository = payment_repository
 
-    async def create(self, payload: EnrollmentCreate) -> Enrollment:
+    async def create(self, payload: LeaseCreate) -> Lease:
         self._validate_fare(payload.monthly_fare)
         self._validate_dates(payload.start_date, payload.end_date)
         await self._validate_references(payload.car_id, payload.vendor_id)
-        await self._validate_no_active_enrollment(payload.car_id)
+        await self._validate_no_active_lease(payload.car_id)
         return await self.repository.create(**payload.model_dump())
 
     async def list_all(
@@ -58,17 +58,17 @@ class EnrollmentService:
         car_id: uuid.UUID | None = None,
         vendor_id: uuid.UUID | None = None,
         active: bool | None = None,
-    ) -> list[Enrollment]:
+    ) -> list[Lease]:
         return await self.repository.list_all(car_id=car_id, vendor_id=vendor_id, active=active)
 
-    async def get_by_id(self, enrollment_id: uuid.UUID) -> Enrollment:
-        enrollment = await self.repository.get_by_id(enrollment_id)
-        if enrollment is None:
-            raise NotFoundException(f"Enrollment {enrollment_id} not found")
-        return enrollment
+    async def get_by_id(self, lease_id: uuid.UUID) -> Lease:
+        lease = await self.repository.get_by_id(lease_id)
+        if lease is None:
+            raise NotFoundException(f"Lease {lease_id} not found")
+        return lease
 
-    async def update(self, enrollment_id: uuid.UUID, payload: EnrollmentUpdate) -> Enrollment:
-        enrollment = await self.get_by_id(enrollment_id)
+    async def update(self, lease_id: uuid.UUID, payload: LeaseUpdate) -> Lease:
+        lease = await self.get_by_id(lease_id)
         updates = payload.model_dump(exclude_unset=True)
 
         if "monthly_fare" in updates:
@@ -76,50 +76,50 @@ class EnrollmentService:
 
         if "start_date" in updates or "end_date" in updates:
             self._validate_dates(
-                updates.get("start_date", enrollment.start_date),
-                updates.get("end_date", enrollment.end_date),
+                updates.get("start_date", lease.start_date),
+                updates.get("end_date", lease.end_date),
             )
 
         becomes_active = "end_date" in updates and updates["end_date"] is None
-        if becomes_active and enrollment.end_date is not None:
-            await self._validate_no_active_enrollment(enrollment.car_id, exclude_id=enrollment.id)
+        if becomes_active and lease.end_date is not None:
+            await self._validate_no_active_lease(lease.car_id, exclude_id=lease.id)
 
-        return await self.repository.update(enrollment, updates)
+        return await self.repository.update(lease, updates)
 
-    async def delete(self, enrollment_id: uuid.UUID) -> None:
-        enrollment = await self.get_by_id(enrollment_id)
+    async def delete(self, lease_id: uuid.UUID) -> None:
+        lease = await self.get_by_id(lease_id)
         from app.features.payments.models import Payment
 
         linked_payment = await self.repository.db.scalar(
-            select(Payment.id).where(Payment.associated_enrollment == enrollment_id).limit(1)
+            select(Payment.id).where(Payment.associated_lease == lease_id).limit(1)
         )
         if linked_payment is not None:
-            raise ConflictException("Cannot delete an enrollment that has a linked payment")
-        await self.repository.delete(enrollment)
+            raise ConflictException("Cannot delete a lease that has a linked payment")
+        await self.repository.delete(lease)
 
-    async def get_due_payments(self, enrollment_id: uuid.UUID) -> DuePaymentsRead:
-        enrollment = await self.get_by_id(enrollment_id)
+    async def get_due_payments(self, lease_id: uuid.UUID) -> DuePaymentsRead:
+        lease = await self.get_by_id(lease_id)
         from app.features.payments.models import Payment
 
         today = date.today()
-        effective_end = min(enrollment.end_date, today) if enrollment.end_date else today
-        all_months = _month_range(enrollment.start_date, effective_end)
+        effective_end = min(lease.end_date, today) if lease.end_date else today
+        all_months = _month_range(lease.start_date, effective_end)
 
         result = await self.repository.db.scalars(
-            select(Payment.payment_date).where(Payment.associated_enrollment == enrollment_id)
+            select(Payment.payment_date).where(Payment.associated_lease == lease_id)
         )
         generated_months = sorted({payment_date.strftime("%Y-%m") for payment_date in result.all()})
         due_months = [month for month in all_months if month not in generated_months]
         return DuePaymentsRead(due_months=due_months, generated_months=generated_months)
 
-    async def generate_due_payments(self, enrollment_id: uuid.UUID) -> list:
-        enrollment = await self.get_by_id(enrollment_id)
-        due = await self.get_due_payments(enrollment_id)
+    async def generate_due_payments(self, lease_id: uuid.UUID) -> list:
+        lease = await self.get_by_id(lease_id)
+        due = await self.get_due_payments(lease_id)
         if not due.due_months:
             return []
 
-        vendor = await self.vendor_repository.get_by_id(enrollment.vendor_id)
-        car = await self.car_repository.get_by_id(enrollment.car_id)
+        vendor = await self.vendor_repository.get_by_id(lease.vendor_id)
+        car = await self.car_repository.get_by_id(lease.car_id)
         owner = await self.car_owner_repository.get_by_id(car.owner_id)
 
         created = []
@@ -127,12 +127,12 @@ class EnrollmentService:
             year, month_num = (int(part) for part in month.split("-"))
             payment = await self.payment_repository.create(
                 type="monthly_fair",
-                car_id=enrollment.car_id,
-                amount=enrollment.monthly_fare,
+                car_id=lease.car_id,
+                amount=lease.monthly_fare,
                 payment_date=date(year, month_num, 1),
                 paid_by=vendor.name,
                 paid_to=owner.name,
-                associated_enrollment=enrollment.id,
+                associated_lease=lease.id,
             )
             created.append(payment)
         return created
@@ -153,19 +153,19 @@ class EnrollmentService:
         if await self.vendor_repository.get_by_id(vendor_id) is None:
             raise NotFoundException(f"Vendor {vendor_id} not found")
 
-    async def _validate_no_active_enrollment(
+    async def _validate_no_active_lease(
         self, car_id: uuid.UUID, *, exclude_id: uuid.UUID | None = None
     ) -> None:
         active = await self.repository.list_all(car_id=car_id, active=True)
-        if any(enrollment.id != exclude_id for enrollment in active):
+        if any(lease.id != exclude_id for lease in active):
             raise ConflictException(
-                "Car already has an active enrollment; end it before starting a new one"
+                "Car already has an active lease; end it before starting a new one"
             )
 
 
-def get_enrollment_service(db: AsyncSession = Depends(get_db)) -> EnrollmentService:
-    return EnrollmentService(
-        EnrollmentRepository(db),
+def get_lease_service(db: AsyncSession = Depends(get_db)) -> LeaseService:
+    return LeaseService(
+        LeaseRepository(db),
         CarRepository(db),
         VendorRepository(db),
         CarOwnerRepository(db),

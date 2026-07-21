@@ -7,7 +7,7 @@ import type { Car, CarInput } from '../types/car'
 import type { CarOwner } from '../types/carOwner'
 import type { Vendor } from '../types/vendor'
 import type { Driver } from '../types/driver'
-import type { Enrollment } from '../types/enrollment'
+import type { Lease } from '../types/lease'
 import './CarsPage.css'
 
 const currentYear = new Date().getFullYear()
@@ -33,7 +33,7 @@ function CarsPage() {
   const [owners, setOwners] = useState<CarOwner[]>([])
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [drivers, setDrivers] = useState<Driver[]>([])
-  const [activeEnrollments, setActiveEnrollments] = useState<Enrollment[]>([])
+  const [activeLeases, setActiveLeases] = useState<Lease[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<ApiError | null>(null)
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -51,15 +51,15 @@ function CarsPage() {
       api.listCarOwners(),
       api.listVendors(),
       api.listDrivers(),
-      api.listEnrollments({ active: true }),
+      api.listLeases({ active: true }),
     ])
-      .then(([carsData, ownersData, vendorsData, driversData, enrollmentsData]) => {
+      .then(([carsData, ownersData, vendorsData, driversData, leasesData]) => {
         if (cancelled) return
         setCars(carsData)
         setOwners(ownersData)
         setVendors(vendorsData)
         setDrivers(driversData)
-        setActiveEnrollments(enrollmentsData)
+        setActiveLeases(leasesData)
       })
       .catch((err) => {
         if (!cancelled) setError(toApiError(err))
@@ -77,9 +77,9 @@ function CarsPage() {
   }
 
   function vendorName(carId: string) {
-    const enrollment = activeEnrollments.find((e) => e.car_id === carId)
-    if (!enrollment) return '—'
-    return vendors.find((vendor) => vendor.id === enrollment.vendor_id)?.name ?? '—'
+    const lease = activeLeases.find((l) => l.car_id === carId)
+    if (!lease) return '—'
+    return vendors.find((vendor) => vendor.id === lease.vendor_id)?.name ?? '—'
   }
 
   function driverName(driverId: string | null) {

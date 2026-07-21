@@ -21,7 +21,7 @@ A Driver is the person who operates a Car day-to-day.
   (numeric) field may belong here — or, if salary can change over time or
   driver assignment has its own start/end dates worth tracking, a dated
   record similar to how [Vendor](02-vendor.md)'s per-car fare is modeled by
-  Enrollment rather than a static field. Not added by default — add if
+  Lease rather than a static field. Not added by default — add if
   confirmed.
 
 ## API Endpoints

@@ -12,7 +12,7 @@ class PaymentCreate(BaseModel):
     associated_maintenance: uuid.UUID | None = None
     associated_cardocs: uuid.UUID | None = None
     associated_fuel: uuid.UUID | None = None
-    associated_enrollment: uuid.UUID | None = None
+    associated_lease: uuid.UUID | None = None
     car_id: uuid.UUID
     amount: Decimal
     payment_date: date
@@ -26,7 +26,7 @@ class PaymentUpdate(BaseModel):
     associated_maintenance: uuid.UUID | None = None
     associated_cardocs: uuid.UUID | None = None
     associated_fuel: uuid.UUID | None = None
-    associated_enrollment: uuid.UUID | None = None
+    associated_lease: uuid.UUID | None = None
     car_id: uuid.UUID | None = None
     amount: Decimal | None = None
     payment_date: date | None = None
@@ -43,7 +43,7 @@ class PaymentRead(BaseModel):
     associated_maintenance: uuid.UUID | None
     associated_cardocs: uuid.UUID | None
     associated_fuel: uuid.UUID | None
-    associated_enrollment: uuid.UUID | None
+    associated_lease: uuid.UUID | None
     car_id: uuid.UUID
     amount: Decimal
     payment_date: date

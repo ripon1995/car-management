@@ -27,16 +27,27 @@ choice made to satisfy the user's stated purpose ("track fuel consumption"
 + "cost management"), not from a written spec — worth confirming with the
 user before extending it further.
 
-A 10th feature, **Enrollment**, replaced `vendors.monthly_fare` and
+A 10th feature, **Lease**, replaced `vendors.monthly_fare` and
 `cars.vendor_id` (also no feature doc, same built-directly-off-user-
 instruction basis as Fuel). The original model had a single static fare per
 vendor and a bare "current vendor" FK on Car with no dates; the user's real
 need was that a vendor leases specific cars for *dated periods* at a
 per-period fare, and a returned car should have a gap where no fare accrues
 until it's re-leased. `cars.vendor_id` is gone entirely — "current vendor
-for a car" is now derived by looking up the Enrollment for that car with
+for a car" is now derived by looking up the Lease for that car with
 `end_date IS NULL`. See "Backend architecture"/"Frontend architecture"
-below for the full shape.
+below for the full shape. **Naming history:** this feature was originally
+built and shipped as "Enrollment" (`app/features/enrollments/`, table
+`enrollments`, `associated_enrollment` on Payment, nav label
+"Enrollments") — the word didn't fit a car-leasing domain, so everything
+was renamed to "Lease" shortly after (user's explicit call). The rename
+touched the backend package/model/table/column/routes, the frontend
+page/types/api module/nav entry, and this doc; migration `0017` is the
+actual DB rename (`enrollments` → `leases` table, `associated_enrollment` →
+`associated_lease` column, plus indexes/constraints) — migrations `0013`
+through `0016` still say "enrollment" in their filenames/content because
+that was the accurate name *at the time* they ran; don't rewrite migration
+history to pretend the name was always "Lease".
 
 **No unit tests in this project by explicit user instruction** — don't add
 a test suite unless asked.
@@ -157,19 +168,19 @@ cross-cutting infrastructure lives outside `app/features/`.
   (rather than relying on the raw FK `IntegrityError` from Postgres) — copy
   this pattern for any other feature whose deletion must be restricted
   while referenced elsewhere. `VendorService.delete()` does the same but
-  against `app.features.enrollments.models.Enrollment.vendor_id` (any row,
+  against `app.features.leases.models.Lease.vendor_id` (any row,
   not just an active one) rather than `Car` directly, since a vendor's
-  relationship to cars is now only through Enrollment — see the
-  `app/features/enrollments/` bullet below. Vendor has **no fare field of
-  its own** anymore; `monthly_fare` lives on Enrollment (dropped from
+  relationship to cars is now only through Lease — see the
+  `app/features/leases/` bullet below. Vendor has **no fare field of
+  its own** anymore; `monthly_fare` lives on Lease (dropped from
   `vendors` in migration `0015`, see "Project state"). `CarService.delete()`
   applies the same referenced-check pattern in the other direction, checking
-  `MaintenanceRecord`/`CarDoc`/`Payment`/`FuelRecord`/`Enrollment` for any
+  `MaintenanceRecord`/`CarDoc`/`Payment`/`FuelRecord`/`Lease` for any
   row whose `car_id` points at the car being deleted.
 - `app/features/cars/` — the hub entity, with FKs to `car_owners`
   (`owner_id`, required) and `drivers` (`driver_id`, optional). **No
   `vendor_id`** — dropped in migration `0014` (see "Project state"); a car's
-  current vendor is derived by looking up its Enrollment with `end_date IS
+  current vendor is derived by looking up its Lease with `end_date IS
   NULL`, not stored on the car itself. `CarService` takes the Car Owner and
   Driver repositories as constructor args (see `get_car_service`, no longer
   takes a `VendorRepository`) and validates: `model_year` is in `[1980,
@@ -219,30 +230,30 @@ cross-cutting infrastructure lives outside `app/features/`.
   below) — added once Payments grew an `associated_fuel` FK (see below);
   `CarService.delete()` also still blocks deleting a car with fuel
   records, same as it does for Maintenance/Car Docs/Payment.
-- `app/features/enrollments/` — the 10th feature (see "Project state"), a
+- `app/features/leases/` — the 10th feature (see "Project state"), a
   dated car↔vendor lease period: required FKs `car_id` → `cars.id` and
   `vendor_id` → `vendors.id`, plus `monthly_fare` (`>= 0`, **(added)**,
   lives here rather than on Vendor or Car specifically so a re-lease at a
   renegotiated rate doesn't overwrite history), `start_date` (required),
   `end_date` (nullable — **null means the lease is currently active**,
-  setting it is how a car is "returned"). `EnrollmentService.create()`
+  setting it is how a car is "returned"). `LeaseService.create()`
   rejects with `ConflictException` if the car already has an active
-  (`end_date IS NULL`) enrollment — only one active lease per car; ending
+  (`end_date IS NULL`) lease — only one active lease per car; ending
   the current one (via `PUT {"end_date": ...}`) is required before starting
   another. `update()` re-checks the same invariant if an edit would clear
   `end_date` back to active. `delete()` blocks with `ConflictException` if a
-  `Payment` references it via `associated_enrollment` (inline import, same
+  `Payment` references it via `associated_lease` (inline import, same
   avoid-circular-import reasoning as Fuel/Maintenance/Car Docs).
-  `GET /enrollments` filters by `car_id`, `vendor_id`, `active`. Two extra
+  `GET /leases` filters by `car_id`, `vendor_id`, `active`. Two extra
   endpoints exist because rent isn't auto-generated (no scheduler/cron in
   this app — user's explicit call): `GET /{id}/due-payments` walks months
   from `start_date` to `min(end_date or today, today)` and buckets each into
   `due_months`/`generated_months` by checking for an existing `Payment` with
-  `associated_enrollment == id` in that month; `POST
+  `associated_lease == id` in that month; `POST
   /{id}/generate-payments` bulk-creates a `monthly_fair` Payment (linked via
-  `associated_enrollment`) for every due month in one call, `paid_by` = the
+  `associated_lease`) for every due month in one call, `paid_by` = the
   vendor's name, `paid_to` = the car owner's name. Because due-months are
-  computed per-enrollment-record, a gap between one enrollment ending and
+  computed per-lease-record, a gap between one lease ending and
   the next starting for the same car naturally has no due months — this is
   what satisfies "no fare while the car sat idle," don't reintroduce a
   synced `cars.vendor_id`/cron-based alternative without re-confirming with
@@ -253,34 +264,34 @@ cross-cutting infrastructure lives outside `app/features/`.
   `associated_fuel` → `fuel_records.id` (added in migration `0012`, after
   Fuel was already live, mirroring the Maintenance/Car Docs linkage
   pattern exactly — user's explicit call, see "Project state"),
-  `associated_enrollment` → `enrollments.id` (added in migration `0016`,
-  same pattern again). `PaymentService` validates `type`
-  (`service`/`document`/`fuel`/`monthly_fair`/`other`), that
-  `associated_maintenance` is only set when `type == "service"`,
+  `associated_lease` → `leases.id` (added as `associated_enrollment` in
+  migration `0016`, renamed by `0017` — same pattern again). `PaymentService`
+  validates `type` (`service`/`document`/`fuel`/`monthly_fair`/`other`),
+  that `associated_maintenance` is only set when `type == "service"`,
   `associated_cardocs` only when `type == "document"`, `associated_fuel`
   only when `type == "fuel"` (all three optional even for their matching
   type — a payment may exist without a formal linked record), and that
   every referenced id actually exists (`NotFoundException`, via
   `CarRepository`/`MaintenanceRepository`/`CarDocRepository`/
-  `FuelRepository`/`EnrollmentRepository`). `associated_enrollment` is
+  `FuelRepository`/`LeaseRepository`). `associated_lease` is
   different: it's **required, not optional, whenever `type ==
   "monthly_fair"`** (`ValidationException` if missing — user's explicit
   call, a `monthly_fair` payment must always trace back to a real lease
   period), and when it's set, `amount` is **not** taken from the request at
   all — `PaymentService.create()`/`update()` silently overwrite `amount`
-  with that Enrollment's `monthly_fare` every time (looked up via
-  `EnrollmentRepository`), so a `monthly_fair` payment's amount can never
-  drift from its linked enrollment's rate; `amount` stays a manually-entered
+  with that Lease's `monthly_fare` every time (looked up via
+  `LeaseRepository`), so a `monthly_fair` payment's amount can never
+  drift from its linked lease's rate; `amount` stays a manually-entered
   required field (validated `>= 0`) only for the other four types. This
-  mirrors `EnrollmentService.generate_due_payments()`'s existing
-  amount-from-enrollment behavior (see the `enrollments` bullet above) —
+  mirrors `LeaseService.generate_due_payments()`'s existing
+  amount-from-lease behavior (see the `leases` bullet above) —
   don't reintroduce a manual `Amount` input for `monthly_fair` payments
   without re-confirming with the user. **Maintenance/Car Docs/Fuel do
   not auto-create a Payment row** — flagged as an open question in
   `05-maintenance.md`/`07-payment.md` and resolved as manual for
   Maintenance/Car Docs (see "Project state"); Fuel's linkage was added
   later under the same manual-only rule, re-confirmed with the user
-  rather than assumed; Enrollment's linkage is also manual — the *bulk*
+  rather than assumed; Lease's linkage is also manual — the *bulk*
   "generate due payments" action is still a user-triggered click, not a
   scheduler. Don't add auto-creation without re-confirming with
   the user first. `GET /payments` filters by `car_id`, `type`, and a
@@ -320,7 +331,7 @@ cross-cutting infrastructure lives outside `app/features/`.
   `app.features.vendors.models`, `app.features.drivers.models`,
   `app.features.cars.models`, `app.features.maintenance.models`,
   `app.features.car_docs.models`, `app.features.payments.models`,
-  `app.features.fuel.models`, `app.features.enrollments.models`) so its
+  `app.features.fuel.models`, `app.features.leases.models`) so its
   tables register on `Base.metadata` before migrations run — add the new
   import there too when adding a feature. Migrations `0006`–`0008` create
   `maintenance_records`/`car_docs`/`payments` in that order (FK
@@ -333,11 +344,16 @@ cross-cutting infrastructure lives outside `app/features/`.
   `add_column`/`drop_column` pair, not a new table, so it didn't need a
   new `alembic/env.py` model import. `0013` creates `enrollments` (FKs to
   both `cars.id` and `vendors.id`); `0014` drops `cars.vendor_id` and
-  `0015` drops `vendors.monthly_fare` — both now redundant once Enrollment
-  is the source of truth for the car↔vendor relationship and its fare (see
-  "Project state"); `0016` adds `payments.associated_enrollment`, same
-  add-column shape as `0012`. `0013` must precede `0016` since Payments'
-  new FK targets the `enrollments` table.
+  `0015` drops `vendors.monthly_fare` — both now redundant once the lease
+  concept is the source of truth for the car↔vendor relationship and its
+  fare (see "Project state"); `0016` adds `payments.associated_enrollment`,
+  same add-column shape as `0012`. `0013` must precede `0016` since
+  Payments' new FK targets the `enrollments` table. `0017` renames
+  `enrollments` → `leases` (table, indexes, PK/FK constraint names) and
+  `payments.associated_enrollment` → `associated_lease` — this is the
+  Enrollment→Lease rename described at the top of this file; **don't
+  rename the `0013`–`0016` files or their content to say "lease"**, they're
+  an accurate record of what the schema was called at the time they ran.
 
 **Known environment quirk:** this venv is Python 3.14 (very new). Standard
 `passlib[bcrypt]` fails at runtime here (`AttributeError: module 'bcrypt'
@@ -357,24 +373,30 @@ business entity gets a page, an API module, and (if it needs more than
 primitive fields) a types file. `app/features/car_owners/` on the backend
 maps to `src/pages/CarOwnersPage.tsx` + `src/api/carOwners.ts` +
 `src/types/carOwner.ts` on the frontend; `vendors`/`drivers`/`cars`/
-`maintenance`/`car_docs`/`payments`/`fuel`/`enrollments` all follow the same
+`maintenance`/`car_docs`/`payments`/`fuel`/`leases` all follow the same
 layout (`VendorsPage.tsx`/`DriversPage.tsx`/`CarsPage.tsx`/
 `MaintenancePage.tsx`/`CarDocsPage.tsx`/`PaymentsPage.tsx`/`FuelPage.tsx`/
-`EnrollmentsPage.tsx` + matching `api/`/`types/` modules); `FuelPage.tsx` at
+`LeasesPage.tsx` + matching `api/`/`types/` modules); `FuelPage.tsx` at
 `/fuel` (nav entry between Maintenance and Car Docs) is copied directly from
 `MaintenancePage.tsx`'s modal-form/data-table/view-modal structure, and
-`EnrollmentsPage.tsx` at `/enrollments` (nav entry between Cars and Vendors)
+`LeasesPage.tsx` at `/leases` (nav entry between Cars and Vendors)
 is likewise copied from `FuelPage.tsx`'s structure, with one addition: its
-view modal fetches `GET /enrollments/{id}/due-payments` on open and renders
+view modal fetches `GET /leases/{id}/due-payments` on open and renders
 a small "Payment status" section (`due_months`/`generated_months`) with a
 "Generate due payments" button when `due_months` is non-empty — a light
 addition inside the existing view-modal shell, not a new page section, same
 restraint as `CarDocsPage.tsx`'s `.expired` styling below. Its create form
-only lets `car_id`/`vendor_id` be chosen when creating a new enrollment
+only lets `car_id`/`vendor_id` be chosen when creating a new lease
 (`editingId` is falsy); editing an existing one shows them as read-only text
-instead, since `EnrollmentUpdate` on the backend doesn't accept those two
+instead, since `LeaseUpdate` on the backend doesn't accept those two
 fields — reassigning a car to a different vendor means ending the current
-enrollment and creating a new one, not editing one in place.
+lease and creating a new one, not editing one in place. **Naming history:**
+this page/route/API-module/nav-entry were originally named "Enrollment"
+(`EnrollmentsPage.tsx`, `/enrollments`, `api/enrollments.ts`,
+`types/enrollment.ts`) and renamed to "Lease" shortly after shipping — see
+"Project state" — so don't be surprised if an old branch or discussion
+still says "Enrollment"; the current code and this doc use "Lease"
+throughout.
 Revenue is the one exception, since it's a read-only dashboard rather than
 a CRUD resource: it's `src/pages/DashboardPage.tsx` (mounted at the
 existing `/dashboard` route/nav entry, not a new `/revenue` route) +
@@ -464,14 +486,14 @@ create button, since there's nothing to create.
   `input` (added for Vendor/Driver's `address` textarea and Car's
   owner/driver `select`s) — reuse these rather than styling a
   one-off. For a feature whose form needs to pick another feature's record
-  (like Car picking a Car Owner/Driver, or Enrollment picking a Car/Vendor),
+  (like Car picking a Car Owner/Driver, or Lease picking a Car/Vendor),
   fetch that sibling feature's list in the same page-load `Promise.all` as
   the page's own list (see `CarsPage.tsx`), use it to populate the
   `<select>` options in the form, and reuse it again to resolve id → name
   for display in the table and view modal (there's no expanded/joined read
   from the API — `CarRead` only carries the raw FK ids). Car specifically
   is picked by five sibling features (Maintenance, Car Docs, Payments,
-  Fuel, Enrollments), all of which display it via the shared
+  Fuel, Leases), all of which display it via the shared
   `carDisplayLabel(car)` helper exported from `src/types/car.ts` — brand +
   model, plus the last 4 digits of `registration_number` in parens when
   present (e.g. `Toyota Corolla (4321)`), so cars sharing a brand/model are
@@ -484,11 +506,11 @@ create button, since there's nothing to create.
   `carLabel(carId)` helper still does the `cars.find` id lookup, then
   delegates formatting to `carDisplayLabel`. `CarsPage.tsx`'s own
   `vendorName(carId)` helper (no `Vendor` FK left on `Car` to look up
-  directly) instead finds the active enrollment for that car id in a
-  `listEnrollments({ active: true })` list fetched alongside cars/owners/
-  vendors/drivers, then resolves that enrollment's `vendor_id` to a name —
+  directly) instead finds the active lease for that car id in a
+  `listLeases({ active: true })` list fetched alongside cars/owners/
+  vendors/drivers, then resolves that lease's `vendor_id` to a name —
   the one car-related lookup here that goes through a second sibling
-  feature (Enrollment) rather than a direct FK on `Car`.
+  feature (Lease) rather than a direct FK on `Car`.
 - `NavIcons.tsx` holds every icon as a small inline-SVG component built
   from the shared `iconProps()` helper (24×24 viewBox, `stroke="currentColor"`,
   `strokeWidth="1.5"`) — add new icons here (e.g. `PlusIcon`) rather than
@@ -499,24 +521,24 @@ create button, since there's nothing to create.
 - `PaymentsPage.tsx`'s form conditionally renders the `associated_maintenance`
   select only when `type === 'service'`, `associated_cardocs` only when
   `type === 'document'`, `associated_fuel` only when `type === 'fuel'`, and
-  `associated_enrollment` only when `type === 'monthly_fair'` (mirroring
+  `associated_lease` only when `type === 'monthly_fair'` (mirroring
   the backend's validation), clearing the other three whenever `type`
   changes (`handleTypeChange`); all four selects filter their options down
   to the currently-selected `car_id` when one is chosen. Reuse this
   conditional-field-by-type pattern for any future feature whose form
   fields depend on a sibling `type`/enum field. The page fetches
-  `listFuelRecords()` and `listEnrollments()` in the same page-load
+  `listFuelRecords()` and `listLeases()` in the same page-load
   `Promise.all` as cars/maintenance/car docs, and labels a fuel option via
   a local `fuelRecordLabel(record)` (`${fuel type label} — ${fuel_station}`)
-  and an enrollment option via `enrollmentRecordLabel(enrollment)`
+  and a lease option via `leaseRecordLabel(lease)`
   (`${vendor name} — ${monthly_fare}/mo`), matching
   `maintenanceRecordLabel`/`carDocRecordLabel`'s one-line-identifying-string
-  shape. Unlike the other three, `associated_enrollment` is `required` on
-  its `<select>` (no "no linked enrollment" empty option), matching backend
+  shape. Unlike the other three, `associated_lease` is `required` on
+  its `<select>` (no "no linked lease" empty option), matching backend
   validation now requiring it for `monthly_fair`; the manual `Amount`
   `<input>` is hidden outright (not shown read-only) whenever `type ===
   'monthly_fair'`, since `PaymentService` derives and overwrites `amount`
-  from the linked Enrollment server-side regardless of what's submitted —
+  from the linked Lease server-side regardless of what's submitted —
   user's explicit call, don't reintroduce it without asking.
 - `CarDocsPage.tsx` colors an already-past `expiry_date` cell with
   `.expired` (`var(--status-critical)`, defined in the page's own CSS
@@ -568,7 +590,7 @@ feature:
 A **Car Owner** owns one or more **Cars**. Each Car has a **Driver**
 assigned to operate it — a current-assignment foreign key on `cars`, not a
 history table. A Car's relationship to a **Vendor** is different: it's a
-dated lease tracked by **Enrollment** (`car_id` + `vendor_id` +
+dated lease tracked by **Lease** (`car_id` + `vendor_id` +
 `monthly_fare` + `start_date`/`end_date`, `end_date IS NULL` meaning
 currently active) rather than a bare FK on `cars` — a vendor leases
 specific cars for specific periods at a per-period fare, and a returned car
@@ -577,8 +599,8 @@ has a gap where no fare accrues until it's re-leased. **Maintenance** and
 respectively. **Payment** is the single ledger of all money movements for a
 car (`type`: `service`, `document`, `fuel`, `monthly_fair`, `other`),
 optionally linked back to the Maintenance/CarDocs/Fuel record that
-generated it — except `monthly_fair`, whose link to an Enrollment is
-**mandatory**, and whose `amount` is always derived from that Enrollment's
+generated it — except `monthly_fair`, whose link to a Lease is
+**mandatory**, and whose `amount` is always derived from that Lease's
 `monthly_fare` rather than entered by hand. **Revenue** has no table of its
 own — it is a dashboard computed on the fly from Payment records:
 `monthly_fair` payments count as income, every other type is deducted as

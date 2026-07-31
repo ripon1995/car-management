@@ -6,6 +6,7 @@ export interface MarkPaidUpdates {
   paid_by: string
   paid_to: string
   payment_date: string
+  description: string | null
 }
 
 interface MarkPaidDialogProps {
@@ -13,23 +14,35 @@ interface MarkPaidDialogProps {
   payment: Payment | null
   carLabel: string
   typeLabel: string
+  title?: string
   isSaving: boolean
   onSave: (updates: MarkPaidUpdates) => void
   onCancel: () => void
 }
 
-function MarkPaidDialog({ open, payment, carLabel, typeLabel, isSaving, onSave, onCancel }: MarkPaidDialogProps) {
+function MarkPaidDialog({
+  open,
+  payment,
+  carLabel,
+  typeLabel,
+  title = 'Mark payment as paid',
+  isSaving,
+  onSave,
+  onCancel,
+}: MarkPaidDialogProps) {
   const [status, setStatus] = useState<PaymentStatus>('paid')
   const [paidBy, setPaidBy] = useState('')
   const [paidTo, setPaidTo] = useState('')
   const [paymentDate, setPaymentDate] = useState('')
+  const [description, setDescription] = useState('')
 
   useEffect(() => {
     if (!open || !payment) return
-    setStatus('paid')
+    setStatus(payment.status)
     setPaidBy(payment.paid_by)
     setPaidTo(payment.paid_to)
     setPaymentDate(payment.payment_date)
+    setDescription(payment.description ?? '')
   }, [open, payment])
 
   useEffect(() => {
@@ -46,7 +59,13 @@ function MarkPaidDialog({ open, payment, carLabel, typeLabel, isSaving, onSave, 
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
-    onSave({ status, paid_by: paidBy, paid_to: paidTo, payment_date: paymentDate })
+    onSave({
+      status,
+      paid_by: paidBy,
+      paid_to: paidTo,
+      payment_date: paymentDate,
+      description: description || null,
+    })
   }
 
   return (
@@ -59,7 +78,7 @@ function MarkPaidDialog({ open, payment, carLabel, typeLabel, isSaving, onSave, 
         onClick={(event) => event.stopPropagation()}
         onSubmit={handleSubmit}
       >
-        <h2 id="mark-paid-title">Mark payment as paid</h2>
+        <h2 id="mark-paid-title">{title}</h2>
         <label className="form-field">
           <span className="form-field-label">Amount</span>
           <span>{payment.amount}</span>
@@ -108,6 +127,10 @@ function MarkPaidDialog({ open, payment, carLabel, typeLabel, isSaving, onSave, 
             onChange={(event) => setPaymentDate(event.target.value)}
             required
           />
+        </label>
+        <label className="form-field">
+          <span className="form-field-label">Description (optional)</span>
+          <textarea value={description} onChange={(event) => setDescription(event.target.value)} />
         </label>
         <div className="modal-actions">
           <button type="button" className="secondary" onClick={onCancel} disabled={isSaving}>

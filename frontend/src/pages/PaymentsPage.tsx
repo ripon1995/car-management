@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent, type RefObject } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { PaymentsIcon, PlusIcon, ViewIcon, EditIcon, DeleteIcon, CheckIcon } from '../components/NavIcons'
 import ErrorDialog from '../components/ErrorDialog'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -15,8 +15,6 @@ import { carDisplayLabel, type Car } from '../types/car'
 import type { MaintenanceRecord } from '../types/maintenance'
 import type { CarDoc } from '../types/carDoc'
 import type { FuelRecord } from '../types/fuel'
-import type { Lease } from '../types/lease'
-import type { Vendor } from '../types/vendor'
 import Loader from '../components/Loader'
 import MarkPaidDialog, { type MarkPaidUpdates } from '../components/MarkPaidDialog'
 import './PaymentsPage.css'
@@ -24,12 +22,13 @@ import './PaymentsPage.css'
 const todayIso = new Date().toISOString().slice(0, 10)
 
 const typeLabels: Record<string, string> = {
-  monthly_fair: 'Monthly fare',
   service: 'Service',
   document: 'Document',
   fuel: 'Fuel',
   other: 'Other',
 }
+
+const EDITABLE_PAYMENT_TYPES = PAYMENT_TYPES.filter((type) => type !== 'monthly_fair')
 
 const maintenanceTypeLabels: Record<string, string> = {
   service: 'Service',
@@ -91,8 +90,6 @@ function PaymentsPage() {
   const [maintenanceRecords, setMaintenanceRecords] = useState<MaintenanceRecord[]>([])
   const [carDocs, setCarDocs] = useState<CarDoc[]>([])
   const [fuelRecords, setFuelRecords] = useState<FuelRecord[]>([])
-  const [leases, setLeases] = useState<Lease[]>([])
-  const [vendors, setVendors] = useState<Vendor[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<ApiError | null>(null)
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -104,7 +101,7 @@ function PaymentsPage() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [markPaidPayment, setMarkPaidPayment] = useState<Payment | null>(null)
   const [isMarkingPaid, setIsMarkingPaid] = useState(false)
-  const paidByInputRef = useRef<HTMLInputElement | HTMLSelectElement>(null)
+  const paidByInputRef = useRef<HTMLSelectElement>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -115,18 +112,14 @@ function PaymentsPage() {
       api.listMaintenance(),
       api.listCarDocs(),
       api.listFuelRecords(),
-      api.listLeases(),
-      api.listVendors(),
     ])
-      .then(([paymentsData, carsData, maintenanceData, carDocsData, fuelData, leasesData, vendorsData]) => {
+      .then(([paymentsData, carsData, maintenanceData, carDocsData, fuelData]) => {
         if (cancelled) return
-        setPayments(paymentsData)
+        setPayments(paymentsData.filter((payment) => payment.type !== 'monthly_fair'))
         setCars(carsData)
         setMaintenanceRecords(maintenanceData)
         setCarDocs(carDocsData)
         setFuelRecords(fuelData)
-        setLeases(leasesData)
-        setVendors(vendorsData)
       })
       .catch((err) => {
         if (!cancelled) setError(toApiError(err))
@@ -161,17 +154,6 @@ function PaymentsPage() {
     if (!id) return '—'
     const record = fuelRecords.find((r) => r.id === id)
     return record ? fuelRecordLabel(record) : '—'
-  }
-
-  function leaseRecordLabel(lease: Lease) {
-    const vendorName = vendors.find((v) => v.id === lease.vendor_id)?.name ?? 'Unknown vendor'
-    return `${vendorName} — ${lease.monthly_fare}/mo — ${lease.start_date}`
-  }
-
-  function leaseLabel(id: string | null) {
-    if (!id) return '—'
-    const lease = leases.find((l) => l.id === id)
-    return lease ? leaseRecordLabel(lease) : '—'
   }
 
   function openCreateForm() {
@@ -234,20 +216,14 @@ function PaymentsPage() {
       associated_maintenance: type === 'service' ? f.associated_maintenance : null,
       associated_cardocs: type === 'document' ? f.associated_cardocs : null,
       associated_fuel: type === 'fuel' ? f.associated_fuel : null,
-      associated_lease: type === 'monthly_fair' ? f.associated_lease : null,
     }))
   }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
     setIsSubmitting(true)
-    const linkedLease =
-      form.type === 'monthly_fair'
-        ? leases.find((l) => l.id === form.associated_lease)
-        : null
     const payload: PaymentInput = {
       ...form,
-      amount: linkedLease ? linkedLease.monthly_fare : form.amount,
       description: form.description || null,
     }
     try {
@@ -292,7 +268,6 @@ function PaymentsPage() {
         associated_lease: markPaidPayment.associated_lease,
         car_id: markPaidPayment.car_id,
         amount: markPaidPayment.amount,
-        description: markPaidPayment.description,
         ...updates,
       }
       const updated = await api.updatePayment(markPaidPayment.id, payload)
@@ -316,7 +291,6 @@ function PaymentsPage() {
   const linkedMaintenanceIds = linkedIds((payment) => payment.associated_maintenance)
   const linkedCarDocIds = linkedIds((payment) => payment.associated_cardocs)
   const linkedFuelIds = linkedIds((payment) => payment.associated_fuel)
-  const linkedLeaseIds = linkedIds((payment) => payment.associated_lease)
 
   const maintenanceOptions = (
     form.car_id ? maintenanceRecords.filter((record) => record.car_id === form.car_id) : maintenanceRecords
@@ -327,9 +301,6 @@ function PaymentsPage() {
   const fuelOptions = (
     form.car_id ? fuelRecords.filter((record) => record.car_id === form.car_id) : fuelRecords
   ).filter((record) => !linkedFuelIds.has(record.id))
-  const leaseOptions = (form.car_id ? leases.filter((lease) => lease.car_id === form.car_id) : leases).filter(
-    (lease) => !linkedLeaseIds.has(lease.id),
-  )
 
   return (
     <main id="content" className="payments-page">
@@ -364,7 +335,7 @@ function PaymentsPage() {
                 onChange={(event) => handleTypeChange(event.target.value as PaymentInput['type'])}
                 required
               >
-                {(editingId ? PAYMENT_TYPES : MANUAL_PAYMENT_TYPES).map((type) => (
+                {(editingId ? EDITABLE_PAYMENT_TYPES : MANUAL_PAYMENT_TYPES).map((type) => (
                   <option key={type} value={type}>
                     {typeLabels[type]}
                   </option>
@@ -442,46 +413,23 @@ function PaymentsPage() {
                 </select>
               </label>
             )}
-            {form.type === 'monthly_fair' && (
-              <label className="form-field">
-                <span className="form-field-label">Linked lease</span>
-                <select
-                  value={form.associated_lease ?? ''}
-                  onChange={(event) =>
-                    setForm((f) => ({ ...f, associated_lease: event.target.value || null }))
-                  }
-                  required
-                >
-                  <option value="" disabled>
-                    Select lease
-                  </option>
-                  {leaseOptions.map((lease) => (
-                    <option key={lease.id} value={lease.id}>
-                      {leaseRecordLabel(lease)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-            {form.type !== 'monthly_fair' && (
-              <label className="form-field">
-                <span className="form-field-label">Amount</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="e.g. 1500.00"
-                  value={form.amount === 0 ? '' : form.amount}
-                  onChange={(event) =>
-                    setForm((f) => ({
-                      ...f,
-                      amount: event.target.value === '' ? 0 : Number(event.target.value),
-                    }))
-                  }
-                  required
-                />
-              </label>
-            )}
+            <label className="form-field">
+              <span className="form-field-label">Amount</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="e.g. 1500.00"
+                value={form.amount === 0 ? '' : form.amount}
+                onChange={(event) =>
+                  setForm((f) => ({
+                    ...f,
+                    amount: event.target.value === '' ? 0 : Number(event.target.value),
+                  }))
+                }
+                required
+              />
+            </label>
             <label className="form-field">
               <span className="form-field-label">Payment date</span>
               <div className="field-with-hint">
@@ -496,31 +444,21 @@ function PaymentsPage() {
             </label>
             <label className="form-field">
               <span className="form-field-label">Paid by</span>
-              {form.type === 'monthly_fair' ? (
-                <input
-                  ref={paidByInputRef as RefObject<HTMLInputElement>}
-                  type="text"
-                  value={form.paid_by}
-                  onChange={(event) => setForm((f) => ({ ...f, paid_by: event.target.value }))}
-                  required
-                />
-              ) : (
-                <select
-                  ref={paidByInputRef as RefObject<HTMLSelectElement>}
-                  value={form.paid_by}
-                  onChange={(event) => setForm((f) => ({ ...f, paid_by: event.target.value }))}
-                  required
-                >
-                  <option value="" disabled>
-                    Select payment method
+              <select
+                ref={paidByInputRef}
+                value={form.paid_by}
+                onChange={(event) => setForm((f) => ({ ...f, paid_by: event.target.value }))}
+                required
+              >
+                <option value="" disabled>
+                  Select payment method
+                </option>
+                {PAID_BY_METHODS.map((method) => (
+                  <option key={method} value={method}>
+                    {method}
                   </option>
-                  {PAID_BY_METHODS.map((method) => (
-                    <option key={method} value={method}>
-                      {method}
-                    </option>
-                  ))}
-                </select>
-              )}
+                ))}
+              </select>
             </label>
             <label className="form-field">
               <span className="form-field-label">Paid to</span>
@@ -585,12 +523,6 @@ function PaymentsPage() {
                 <div>
                   <dt>Linked fuel record</dt>
                   <dd>{fuelLabel(viewingPayment.associated_fuel)}</dd>
-                </div>
-              )}
-              {viewingPayment.type === 'monthly_fair' && (
-                <div>
-                  <dt>Linked lease</dt>
-                  <dd>{leaseLabel(viewingPayment.associated_lease)}</dd>
                 </div>
               )}
               <div>

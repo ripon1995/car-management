@@ -398,13 +398,37 @@ per-lease `getDuePayments(lease.id)` call (the same Lease endpoints
 per (lease, month) from the union of each lease's `due_months`/
 `generated_months`, resolving generated months to their real `Payment`
 (for `status`/`id`/`amount`) and rendering due-but-not-yet-generated
-months as synthetic "Not received" rows. Clicking a "Not received" row's
-action either opens the shared `MarkPaidDialog` directly (already
-generated, still `unpaid`) or first calls `POST
-/leases/{id}/generate-payments` (bulk — generates every due month for
-that lease, not just the clicked one) and then opens the dialog for the
-newly-created payment matching that month — accepted as a minor UX
-side-effect rather than adding a per-month generate endpoint.
+months as synthetic "Not received" rows (`row.payment === null`).
+
+A row's Action column depends on whether it has a real `Payment` behind
+it (added 2026-08-01, see `docs/decisions.md` — Income is where
+`monthly_fair` payments are viewed/edited/deleted now, since
+`PaymentsPage.tsx` excludes that type entirely):
+- **Synthetic row** (not yet generated): a single "Mark as received"
+  `.icon-btn` that calls `POST /leases/{id}/generate-payments` (bulk —
+  generates every due month for that lease, not just the clicked one,
+  accepted as a minor UX side-effect rather than adding a per-month
+  generate endpoint), refetches due-payments + `monthly_fair` payments,
+  then opens `MarkPaidDialog` for the newly-created payment matching that
+  month.
+- **Real, `unpaid` row**: View/Edit/"Mark as received"/Delete, matching
+  `PaymentsPage.tsx`'s table's icon set and order.
+- **Real, `paid` row**: View/Edit/Delete only (no mark-as-received action,
+  already received).
+View opens a read-only `<dl className="detail-list">` modal
+(`viewingRow: IncomeRow | null` state, keyed off the row rather than just
+the `Payment` so Car/Vendor/Month can be shown even though those live on
+the row's `Lease`, not the `Payment` itself) with an "Edit" button in its
+footer that closes the view and opens the edit dialog. Edit reuses
+`MarkPaidDialog` (see the Mark-paid dialog bullet) with `title="Edit
+payment"` instead of the default "Mark payment as paid" — same dialog,
+same `confirmMarkPaid()` handler as the mark-as-received flow, just a
+different opening title (`dialogTitle` state) and trigger. Delete uses
+the standard `ConfirmDialog`/`pendingDelete`/`isDeleting` pattern (see
+the Confirm dialog bullet), calling `api.deletePayment()`; deleting a
+generated monthly-fair payment also refetches that lease's due-payments
+so the row reverts to a synthetic "not generated" one instead of vanishing
+or going stale.
 
 - `src/api/client.ts` — `request<T>(path, options)` (fetch wrapper: base
   URL, JSON headers, error → `ApiError` mapping, 401 →
@@ -458,19 +482,28 @@ side-effect rather than adding a per-month generate endpoint.
   not for page-level list "Loading…" states, which stay plain text.
 - **Mark-paid dialog:** `src/components/MarkPaidDialog.tsx` is the second
   truly-shared (not per-page-duplicated) modal, alongside `ConfirmDialog`
-  — used verbatim by both `PaymentsPage.tsx` and `IncomePage.tsx` to flip
-  an `unpaid` Payment to `paid`. Standard `.modal-backdrop`/
-  `.modal-panel.card`/`.form-field` shell; read-only Amount/Car/Type plus
-  editable `status`/`paid_by`/`paid_to`/`payment_date` fields, seeded from
-  the target `Payment` prop via a `useEffect` keyed on `payment?.id`. Both
-  call sites build a full `PaymentInput` (spreading the source payment's
-  other fields, not a partial) before `api.updatePayment(id, ...)`, since
-  `updatePayment` takes the complete shape. Reuse this component rather
-  than duplicating the status-change form per page. `Paid by` renders as a
-  free-text `<input>` when `payment.type === 'monthly_fair'`, otherwise as
-  a `<select>` over `PAID_BY_METHODS` (`src/types/payment.ts` —
-  `['EBL', 'DBBL', 'UCB', 'CASH']`), matching the backend's
-  `_validate_paid_by()`.
+  — used by both `PaymentsPage.tsx` and `IncomePage.tsx` for two purposes,
+  not just marking a payment paid: `PaymentsPage.tsx` opens it for its
+  "mark as paid" action only; `IncomePage.tsx` opens it for **both**
+  "mark as received" and its Edit action (added 2026-08-01, since
+  `monthly_fair` payments are edited only from Income now — see
+  `docs/decisions.md`), passing a `title` prop (`'Mark as received'` vs
+  `'Edit payment'`, default `'Mark payment as paid'`) to distinguish them
+  — same fields, same `confirmMarkPaid()` handler either way. Standard
+  `.modal-backdrop`/`.modal-panel.card`/`.form-field` shell; read-only
+  Amount/Car/Type plus editable `status`/`paid_by`/`paid_to`/
+  `payment_date`/`description` fields, seeded from the target `Payment`
+  prop via a `useEffect` keyed on `payment?.id` (`status` seeds from
+  `payment.status`, not hardcoded to `'paid'`, so opening it to edit an
+  already-paid or still-unpaid row shows its real status rather than
+  silently flipping it). Both call sites build a full `PaymentInput`
+  (spreading the source payment's other fields, not a partial) before
+  `api.updatePayment(id, ...)`, since `updatePayment` takes the complete
+  shape. Reuse this component rather than duplicating the status-change
+  form per page. `Paid by` renders as a free-text `<input>` when
+  `payment.type === 'monthly_fair'`, otherwise as a `<select>` over
+  `PAID_BY_METHODS` (`src/types/payment.ts` — `['EBL', 'DBBL', 'UCB',
+  'CASH']`), matching the backend's `_validate_paid_by()`.
 - Shared page-chrome classes live in `App.css` (global, not per-page) since
   every feature page reuses them — add new cross-page primitives there,
   not in a page's own CSS file:
@@ -568,40 +601,31 @@ side-effect rather than adding a per-month generate endpoint.
 - Auth/session state lives in `src/store/authStore.ts` (zustand), not
   per-page state — feature pages only hold their own list/form/loading
   state locally with `useState`, matching `CarOwnersPage.tsx`.
-- `PaymentsPage.tsx`'s form conditionally renders the `associated_maintenance`
-  select only when `type === 'service'`, `associated_cardocs` only when
-  `type === 'document'`, `associated_fuel` only when `type === 'fuel'`, and
-  `associated_lease` only when `type === 'monthly_fair'` (mirroring
-  the backend's validation), clearing the other three whenever `type`
-  changes (`handleTypeChange`); all four selects filter their options down
-  to the currently-selected `car_id` when one is chosen. Reuse this
+- **`PaymentsPage.tsx` never shows `monthly_fair` payments** (added
+  2026-08-01, see `docs/decisions.md`) — that type lives entirely on the
+  Income page now. The page-load fetch filters them out of state
+  (`paymentsData.filter((payment) => payment.type !== 'monthly_fair')`,
+  since `GET /payments` has no "not equal" filter), the Type `<select>`
+  uses `EDITABLE_PAYMENT_TYPES = PAYMENT_TYPES.filter((type) => type !==
+  'monthly_fair')` in edit mode (create mode still uses
+  `MANUAL_PAYMENT_TYPES = ['other']`), and the page no longer fetches
+  `listLeases()`/`listVendors()` or renders a "Linked lease" field —
+  since `monthly_fair` can't reach this page, `Paid by` is unconditionally
+  the `PAID_BY_METHODS` `<select>` (no free-text branch) and `Amount` is
+  unconditionally shown (no more `type !== 'monthly_fair'` guard around
+  it). The form conditionally renders the `associated_maintenance` select
+  only when `type === 'service'`, `associated_cardocs` only when
+  `type === 'document'`, `associated_fuel` only when `type === 'fuel'`
+  (mirroring the backend's validation), clearing the other two whenever
+  `type` changes (`handleTypeChange`); both selects filter their options
+  down to the currently-selected `car_id` when one is chosen. Reuse this
   conditional-field-by-type pattern for any future feature whose form
   fields depend on a sibling `type`/enum field. The page fetches
-  `listFuelRecords()` and `listLeases()` in the same page-load
-  `Promise.all` as cars/maintenance/car docs, and labels a fuel option via
-  a local `fuelRecordLabel(record)` (`${fuel type label} — ${fuel_station}`)
-  and a lease option via `leaseRecordLabel(lease)`
-  (`${vendor name} — ${monthly_fare}/mo`), matching
-  `maintenanceRecordLabel`/`carDocRecordLabel`'s one-line-identifying-string
-  shape. Unlike the other three, `associated_lease` is `required` on
-  its `<select>` (no "no linked lease" empty option), matching backend
-  validation now requiring it for `monthly_fair`; the manual `Amount`
-  `<input>` is hidden outright (not shown read-only) whenever `type ===
-  'monthly_fair'`, since `PaymentService` derives and overwrites `amount`
-  from the linked Lease server-side regardless of what's submitted — don't
-  reintroduce it without asking. The **create** form's Type `<select>`
-  only iterates `MANUAL_PAYMENT_TYPES` (`['other']`, from
-  `src/types/payment.ts`) rather than the full `PAYMENT_TYPES` — service/
-  document/fuel/monthly_fair payments are now exclusively produced by
-  auto-creation (Maintenance/Car Docs/Fuel/Income), so manual creation on
-  this page is `other`-only; the **edit** form still iterates the full
-  `PAYMENT_TYPES` list, since existing rows of any type can land here.
-  The `Paid by` field mirrors `MarkPaidDialog`'s split: a `<select>` over
-  `PAID_BY_METHODS` whenever `form.type !== 'monthly_fair'` (always true
-  in create mode, since create is `other`-only), a free-text `<input>`
-  when editing a `monthly_fair` row. `paidByInputRef` (used to autofocus
-  the field on open) is typed `RefObject<HTMLInputElement |
-  HTMLSelectElement>` to cover both.
+  `listFuelRecords()` in the same page-load `Promise.all` as cars/
+  maintenance/car docs, and labels a fuel option via a local
+  `fuelRecordLabel(record)` (`${fuel type label} — ${fuel_station}`),
+  matching `maintenanceRecordLabel`/`carDocRecordLabel`'s
+  one-line-identifying-string shape.
   The table has a `Status` column (`.status-badge`) and, for any row with
   `status === 'unpaid'`, a "mark as paid" `.icon-btn` (`CheckIcon` from
   `NavIcons.tsx`) that opens the shared `MarkPaidDialog` (see the
@@ -623,7 +647,19 @@ side-effect rather than adding a per-month generate endpoint.
   `scripts/validate_palette.js`) rather than the app's single `--accent`
   token. See `docs/decisions.md` for why; if a future feature needs
   another chart, reuse this approach rather than introducing a chart
-  library without checking with the user first.
+  library without checking with the user first. The stat tiles/donut/bar
+  chart all render `summary` straight from `GET /revenue` (already
+  cash-basis server-side — see the Revenue bullet above). The **drill-down
+  table** (shown only in `filteredMode`, i.e. a car/date filter is active)
+  is different: it fetches raw `Payment` rows directly via
+  `api.listPayments(...)` and computes `signed`/`paymentsNet` locally
+  (`type === INCOME_TYPE ? +amount : -amount`) rather than reading
+  `summary`, so that fetch also passes `status: 'paid'` (added
+  2026-08-01, see `docs/decisions.md`) — without it, an `unpaid` row in
+  the filtered range would count toward the drill-down's local net total
+  while being excluded from the top-line `summary.net_revenue`, silently
+  disagreeing with itself. Keep both fetches (`getRevenue`/`listPayments`)
+  paid-only if either one's filtering logic changes.
 
 ## What this project is
 

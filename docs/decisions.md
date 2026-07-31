@@ -128,6 +128,39 @@ person picks. Enforced in `PaymentService._validate_paid_by()` on both
 `PaymentsPage.tsx`'s and `MarkPaidDialog.tsx`'s `paid_by` `<input>` for a
 `<select>` whenever the payment's type isn't `monthly_fair`.
 
+**Second follow-up, same day:** `monthly_fair` payments were removed from
+`PaymentsPage.tsx` entirely (list, forms, view modal) — user's explicit
+call, since the Income page already fully owns that type's lifecycle
+(generate/mark-received) and showing it in two places was redundant/
+confusing. No backend change was needed for this part (`GET /payments`
+still returns every type; `PaymentsPage.tsx` just filters `type !==
+'monthly_fair'` out of the fetched list client-side and drops
+`monthly_fair` from its editable-type list and lease-related state/
+fields). This also surfaced a real, pre-existing inconsistency in
+`DashboardPage.tsx`: its filtered drill-down table computed a local net
+total from `listPayments(...)` without a `status` filter, so an `unpaid`
+row could count toward that local total while being excluded from the
+top-line `summary.net_revenue` (which has been cash-basis, `status:
+'paid'`-only, since the original status/auto-payment change above). Fixed
+by adding `status: 'paid'` to that one `listPayments` call so both
+numbers agree.
+
+**Third follow-up, same day:** removing `monthly_fair` from
+`PaymentsPage.tsx` (previous entry) meant there was no longer any UI to
+view, edit, or delete a `monthly_fair` Payment at all — Income only had
+"mark as received." User asked for View/Edit/Delete on Income too, so
+that page now carries the full action set `PaymentsPage.tsx` has, scoped
+to rows with a real `Payment` behind them (a synthetic not-yet-generated
+row still only gets the single generate-then-mark action). Rather than
+build a second status-editing form, `MarkPaidDialog.tsx` was extended
+with an optional `title` prop and a `description` field, and reused for
+Income's Edit action (`title="Edit payment"`) as well as its
+mark-as-received action (`title="Mark as received"`) — same fields, same
+save handler, just a different opening title depending on which icon was
+clicked. Its `status` field now seeds from the target payment's actual
+`status` instead of always defaulting to `'paid'`, since Edit (unlike
+mark-as-received) shouldn't silently flip status just by opening.
+
 ## Frontend form-field labeling: why placeholder-only fields were removed
 
 Every form field was originally allowed to rely on `placeholder` text

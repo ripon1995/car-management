@@ -242,7 +242,12 @@ function DashboardPage() {
     }
     let cancelled = false
     api
-      .listPayments({ carId: carId || undefined, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined })
+      .listPayments({
+        carId: carId || undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+        status: 'paid',
+      })
       .catch(() => undefined)
       .then((data) => {
         if (!cancelled && data) setPayments(data)

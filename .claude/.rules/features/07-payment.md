@@ -15,6 +15,11 @@ or Fuel record is created, by the Maintenance/Car Docs/Fuel features
 directly (bypassing this feature's own create endpoint/validation). The
 Payments page's manual "create" flow is `other`-only on the frontend now;
 the backend endpoint still accepts every `type` for API completeness.
+`monthly_fair` payments are excluded from the Payments page entirely
+(not just from manual creation) — that type is fully managed on the
+Income page (see [Revenue](08-revenue.md) and `CLAUDE.md`'s Frontend
+architecture section), so the Payments page's fetch filters `type !==
+'monthly_fair'` and its Type dropdown/forms never offer or display it.
 
 ## Data Model — `payments`
 | Field                  | Type          | Required | Notes |

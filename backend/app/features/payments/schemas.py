@@ -5,6 +5,7 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict
 
 PAYMENT_TYPES = ("service", "document", "fuel", "monthly_fair", "other")
+PAYMENT_STATUSES = ("paid", "unpaid")
 
 
 class PaymentCreate(BaseModel):
@@ -18,6 +19,7 @@ class PaymentCreate(BaseModel):
     payment_date: date
     paid_by: str
     paid_to: str
+    status: str = "paid"
     description: str | None = None
 
 
@@ -32,6 +34,7 @@ class PaymentUpdate(BaseModel):
     payment_date: date | None = None
     paid_by: str | None = None
     paid_to: str | None = None
+    status: str | None = None
     description: str | None = None
 
 
@@ -49,6 +52,7 @@ class PaymentRead(BaseModel):
     payment_date: date
     paid_by: str
     paid_to: str
+    status: str
     description: str | None
     created_at: datetime
     updated_at: datetime

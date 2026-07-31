@@ -4,7 +4,17 @@
 Ledger of individual money movements tied to a car. Only `monthly_fair`
 payments count as income (added to Revenue); every other type
 (`service`, `document`, `other`) is deducted from Revenue. This is the
-source data the [Revenue](08-revenue.md) dashboard aggregates.
+source data the [Revenue](08-revenue.md) dashboard aggregates — and only
+`status = "paid"` payments are included in that aggregation (see Business
+Rules).
+
+**Reversed 2026-08-01** (see `docs/decisions.md`): `service`/`document`/
+`fuel` payments are no longer created by hand on the Payments page — they
+are auto-created (as `status = "unpaid"`) whenever a Maintenance, Car Doc,
+or Fuel record is created, by the Maintenance/Car Docs/Fuel features
+directly (bypassing this feature's own create endpoint/validation). The
+Payments page's manual "create" flow is `other`-only on the frontend now;
+the backend endpoint still accepts every `type` for API completeness.
 
 ## Data Model — `payments`
 | Field                  | Type          | Required | Notes |
@@ -18,8 +28,9 @@ source data the [Revenue](08-revenue.md) dashboard aggregates.
 | car_id                 | uuid (FK)     | yes      | → `cars.id` — **(added)** not in the original field list; needed so `monthly_fair`/`other` payments (which have no associated_maintenance/associated_cardocs to derive a car from) can still be attributed to a car for the Revenue dashboard |
 | amount                 | numeric(12,2) | yes      | **(added)** not in the original field list; required for Revenue math to work regardless of type. For `type = monthly_fair` it is **not** taken from the request — the backend always overwrites it with the linked Lease's `monthly_fare`, so the UI doesn't ask for it at all (see Business Rules). For every other type it's still entered directly on the payment. |
 | payment_date           | date          | yes      | **(added)** not in the original field list; required to group Revenue's bar chart by period (e.g. month) |
-| paid_by                | varchar       | yes      | free text — e.g. vendor/owner name |
-| paid_to                | varchar       | yes      | free text — e.g. mechanic/vendor/owner name |
+| paid_by                | varchar       | yes      | free text — e.g. vendor/owner name. Auto-created payments (see below) start as an empty string until filled in when the payment is marked paid |
+| paid_to                | varchar       | yes      | free text — e.g. mechanic/vendor/owner name. Same empty-string-until-marked-paid behavior as `paid_by` for auto-created payments |
+| status                 | varchar       | yes      | **(added)** 2026-08-01, migration `0018`; enum `paid`/`unpaid`. Defaults to `paid` (DB `server_default` + `PaymentCreate` default) — manually-created payments and all pre-existing rows represent already-settled money. Auto-created payments (from Maintenance/Car Docs/Fuel, and Lease's bulk `generate-payments`) are created with `status="unpaid"` explicitly, bypassing this default |
 | description            | text          | no       | |
 | created_at             | timestamptz   | yes      | |
 | updated_at             | timestamptz   | yes      | |
@@ -43,11 +54,12 @@ source data the [Revenue](08-revenue.md) dashboard aggregates.
   scheduler.
 
 ## API Endpoints
-- `GET /api/v1/payments` — list, filter by `car_id`, `type`, date range;
-  paginated.
+- `GET /api/v1/payments` — list, filter by `car_id`, `type`, `status`,
+  date range; paginated.
 - `POST /api/v1/payments`
 - `GET /api/v1/payments/{id}`
-- `PUT /api/v1/payments/{id}`
+- `PUT /api/v1/payments/{id}` — how a payment is marked paid: `PUT` with
+  `status: "paid"` plus real `paid_by`/`paid_to`/`payment_date`.
 - `DELETE /api/v1/payments/{id}`
 
 ## Business Rules & Validation
@@ -70,3 +82,21 @@ source data the [Revenue](08-revenue.md) dashboard aggregates.
   is the one exception — it's mandatory for `monthly_fair`, since a payment
   of that type isn't meaningful without an amount to derive, and the
   amount is only knowable via the linked Lease.
+- `status` must be one of `paid`/`unpaid` (`ValidationException`
+  otherwise, same shape as the `type` check).
+- **Auto-creation** (2026-08-01, see `docs/decisions.md`): creating a
+  Maintenance, Car Doc, or Fuel record auto-creates its linked Payment
+  directly (bypassing this feature's own `create()`/validation) with
+  `amount` = the record's `cost`, `status="unpaid"`, `paid_by`/`paid_to`
+  left blank, and `payment_date` = the record's own transaction date if it
+  has one (Fuel's `fuel_date`) or today's date otherwise (Maintenance/Car
+  Docs have no transaction-date field). Lease's bulk `POST
+  /leases/{id}/generate-payments` does the same for `monthly_fair`
+  payments, one per due month, also `status="unpaid"`.
+- **Deletion is blocked by a linked Payment only when that Payment is
+  already `paid`.** Maintenance/Car Docs/Fuel's `delete()` deletes any
+  still-`unpaid` linked Payment along with the record instead of blocking
+  — an unpaid auto-created payment is a pending stub, not real financial
+  history that needs protecting. Lease's `delete()` is unchanged (still
+  blocks on any linked Payment regardless of status), since a Lease isn't
+  auto-linked to a Payment the same way.

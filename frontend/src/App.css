@@ -67,6 +67,25 @@
   box-shadow: var(--shadow);
 }
 
+/* Shared Paid/Unpaid, Received/Not received badge for Payments and Income. */
+.status-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.status-badge.paid {
+  color: var(--status-good);
+  background: var(--status-good-bg);
+}
+
+.status-badge.unpaid {
+  color: var(--status-critical);
+  background: var(--status-critical-bg);
+}
+
 /* Shared list/table style for every feature's list page. */
 .data-table-wrap {
   width: 100%;

@@ -14,7 +14,7 @@ from app.features.leases.repository import LeaseRepository
 from app.features.maintenance.repository import MaintenanceRepository
 from app.features.payments.models import Payment
 from app.features.payments.repository import PaymentRepository
-from app.features.payments.schemas import PAYMENT_TYPES, PaymentCreate, PaymentUpdate
+from app.features.payments.schemas import PAYMENT_STATUSES, PAYMENT_TYPES, PaymentCreate, PaymentUpdate
 
 
 class PaymentService:
@@ -38,6 +38,7 @@ class PaymentService:
 
     async def create(self, payload: PaymentCreate) -> Payment:
         self._validate_type(payload.type)
+        self._validate_status(payload.status)
         self._validate_associations(
             payload.type,
             payload.associated_maintenance,
@@ -66,9 +67,10 @@ class PaymentService:
         type: str | None = None,
         date_from: date | None = None,
         date_to: date | None = None,
+        status: str | None = None,
     ) -> list[Payment]:
         return await self.repository.list_all(
-            car_id=car_id, type=type, date_from=date_from, date_to=date_to
+            car_id=car_id, type=type, date_from=date_from, date_to=date_to, status=status
         )
 
     async def get_by_id(self, payment_id: uuid.UUID) -> Payment:
@@ -83,6 +85,8 @@ class PaymentService:
 
         if "type" in updates:
             self._validate_type(updates["type"])
+        if "status" in updates:
+            self._validate_status(updates["status"])
 
         association_fields = (
             "type",
@@ -139,6 +143,11 @@ class PaymentService:
     def _validate_amount(amount: Decimal | None) -> None:
         if amount is None or amount < 0:
             raise ValidationException("amount must be >= 0")
+
+    @staticmethod
+    def _validate_status(status: str) -> None:
+        if status not in PAYMENT_STATUSES:
+            raise ValidationException(f"status must be one of {', '.join(PAYMENT_STATUSES)}")
 
     @staticmethod
     def _validate_associations(

@@ -6,6 +6,7 @@ export interface PaymentFilters {
   type?: string
   dateFrom?: string
   dateTo?: string
+  status?: string
 }
 
 export function listPayments(filters: PaymentFilters = {}): Promise<Payment[]> {
@@ -14,6 +15,7 @@ export function listPayments(filters: PaymentFilters = {}): Promise<Payment[]> {
   if (filters.type) params.set('type', filters.type)
   if (filters.dateFrom) params.set('date_from', filters.dateFrom)
   if (filters.dateTo) params.set('date_to', filters.dateTo)
+  if (filters.status) params.set('status', filters.status)
   const query = params.toString()
   return request<Payment[]>(`/payments${query ? `?${query}` : ''}`, { headers: authHeaders() })
 }

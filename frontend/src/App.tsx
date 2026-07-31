@@ -9,6 +9,7 @@ import DashboardPage from './pages/DashboardPage'
 import CarOwnersPage from './pages/CarOwnersPage'
 import CarsPage from './pages/CarsPage'
 import LeasesPage from './pages/LeasesPage'
+import IncomePage from './pages/IncomePage'
 import VendorsPage from './pages/VendorsPage'
 import DriversPage from './pages/DriversPage'
 import MaintenancePage from './pages/MaintenancePage'
@@ -63,6 +64,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <LeasesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/income"
+              element={
+                <ProtectedRoute>
+                  <IncomePage />
                 </ProtectedRoute>
               }
             />

@@ -23,6 +23,7 @@ class PaymentRepository:
         type: str | None = None,
         date_from: date | None = None,
         date_to: date | None = None,
+        status: str | None = None,
     ) -> list[Payment]:
         query = select(Payment).order_by(Payment.payment_date)
         if car_id is not None:
@@ -33,6 +34,8 @@ class PaymentRepository:
             query = query.where(Payment.payment_date >= date_from)
         if date_to is not None:
             query = query.where(Payment.payment_date <= date_to)
+        if status is not None:
+            query = query.where(Payment.status == status)
         result = await self.db.scalars(query)
         return list(result.all())
 

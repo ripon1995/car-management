@@ -4,7 +4,7 @@ import ErrorDialog from '../components/ErrorDialog'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { ApiError } from '../errors/api'
 import * as api from '../api'
-import type { Lease, LeaseInput, DuePayments } from '../types/lease'
+import type { Lease, LeaseInput } from '../types/lease'
 import { carDisplayLabel, type Car } from '../types/car'
 import type { Vendor } from '../types/vendor'
 import Loader from '../components/Loader'
@@ -35,9 +35,6 @@ function LeasesPage() {
   const [viewingLease, setViewingLease] = useState<Lease | null>(null)
   const [pendingDelete, setPendingDelete] = useState<Lease | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
-  const [dueStatus, setDueStatus] = useState<DuePayments | null>(null)
-  const [isDueLoading, setIsDueLoading] = useState(false)
-  const [isGenerating, setIsGenerating] = useState(false)
   const carSelectRef = useRef<HTMLSelectElement>(null)
 
   useEffect(() => {
@@ -111,34 +108,13 @@ function LeasesPage() {
   }, [isFormOpen, editingId])
 
   useEffect(() => {
-    if (!viewingLease) {
-      setDueStatus(null)
-      return
-    }
+    if (!viewingLease) return
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') setViewingLease(null)
     }
     document.addEventListener('keydown', handleKeyDown)
-
-    let cancelled = false
-    setIsDueLoading(true)
-    api
-      .getDuePayments(viewingLease.id)
-      .then((data) => {
-        if (!cancelled) setDueStatus(data)
-      })
-      .catch((err) => {
-        if (!cancelled) setError(toApiError(err))
-      })
-      .finally(() => {
-        if (!cancelled) setIsDueLoading(false)
-      })
-
-    return () => {
-      cancelled = true
-      document.removeEventListener('keydown', handleKeyDown)
-    }
+    return () => document.removeEventListener('keydown', handleKeyDown)
   }, [viewingLease])
 
   async function handleSubmit(event: FormEvent) {
@@ -176,20 +152,6 @@ function LeasesPage() {
     } finally {
       setIsDeleting(false)
       setPendingDelete(null)
-    }
-  }
-
-  async function handleGenerate() {
-    if (!viewingLease) return
-    setIsGenerating(true)
-    try {
-      await api.generateDuePayments(viewingLease.id)
-      const refreshed = await api.getDuePayments(viewingLease.id)
-      setDueStatus(refreshed)
-    } catch (err) {
-      setError(toApiError(err))
-    } finally {
-      setIsGenerating(false)
     }
   }
 
@@ -364,29 +326,6 @@ function LeasesPage() {
                 <dd>{new Date(viewingLease.updated_at).toLocaleString()}</dd>
               </div>
             </dl>
-            <div className="payment-status">
-              <h3>Payment status</h3>
-              {isDueLoading ? (
-                <p>Loading…</p>
-              ) : dueStatus ? (
-                <>
-                  <p>
-                    Generated: {dueStatus.generated_months.length > 0 ? dueStatus.generated_months.join(', ') : '—'}
-                  </p>
-                  <p>Due: {dueStatus.due_months.length > 0 ? dueStatus.due_months.join(', ') : 'None'}</p>
-                  {dueStatus.due_months.length > 0 && (
-                    <button
-                      type="button"
-                      className="btn-primary"
-                      onClick={handleGenerate}
-                      disabled={isGenerating}
-                    >
-                      {isGenerating ? 'Generating…' : 'Generate due payments'}
-                    </button>
-                  )}
-                </>
-              ) : null}
-            </div>
             <div className="modal-actions">
               <button type="button" className="secondary" onClick={() => setViewingLease(null)}>
                 Close

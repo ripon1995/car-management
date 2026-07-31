@@ -31,6 +31,7 @@ class Payment(Base):
     payment_date: Mapped[date] = mapped_column(Date, nullable=False)
     paid_by: Mapped[str] = mapped_column(String, nullable=False)
     paid_to: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False, server_default="paid")
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(

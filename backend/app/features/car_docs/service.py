@@ -25,7 +25,22 @@ class CarDocService:
         self._validate_doc_type(payload.doc_type)
         self._validate_cost(payload.cost)
         await self._validate_car(payload.car_id)
-        return await self.repository.create(**payload.model_dump())
+        car_doc = await self.repository.create(**payload.model_dump())
+
+        from app.features.payments.repository import PaymentRepository
+
+        await PaymentRepository(self.repository.db).create(
+            type="document",
+            car_id=car_doc.car_id,
+            associated_cardocs=car_doc.id,
+            amount=car_doc.cost,
+            payment_date=date.today(),
+            paid_by="",
+            paid_to="",
+            status="unpaid",
+            description=None,
+        )
+        return car_doc
 
     async def list_all(
         self,
@@ -59,12 +74,18 @@ class CarDocService:
     async def delete(self, car_doc_id: uuid.UUID) -> None:
         car_doc = await self.get_by_id(car_doc_id)
         from app.features.payments.models import Payment
+        from app.features.payments.repository import PaymentRepository
 
-        linked_payment = await self.repository.db.scalar(
-            select(Payment.id).where(Payment.associated_cardocs == car_doc_id).limit(1)
+        linked = list(
+            await self.repository.db.scalars(
+                select(Payment).where(Payment.associated_cardocs == car_doc_id)
+            )
         )
-        if linked_payment is not None:
-            raise ConflictException("Cannot delete a car doc that has a linked payment")
+        if any(payment.status == "paid" for payment in linked):
+            raise ConflictException("Cannot delete a car doc that has a paid linked payment")
+        payment_repository = PaymentRepository(self.repository.db)
+        for payment in linked:
+            await payment_repository.delete(payment)
         await self.repository.delete(car_doc)
 
     @staticmethod

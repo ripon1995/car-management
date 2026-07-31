@@ -148,6 +148,22 @@ export function CarDocsIcon() {
   )
 }
 
+export function IncomeIcon() {
+  return (
+    <svg {...iconProps()}>
+      <path
+        d="M4 16.5 9.5 11l3.5 3.5L20 7"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M14.5 7H20v5.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4 20h16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 export function PaymentsIcon() {
   return (
     <svg {...iconProps()}>
@@ -192,6 +208,20 @@ export function ViewIcon() {
         strokeLinejoin="round"
       />
       <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  )
+}
+
+export function CheckIcon() {
+  return (
+    <svg {...iconProps()}>
+      <path
+        d="M5 12.5 9.5 17 19 7"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   )
 }

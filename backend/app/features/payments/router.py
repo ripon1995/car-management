@@ -17,9 +17,12 @@ async def list_payments(
     type: str | None = None,
     date_from: date | None = None,
     date_to: date | None = None,
+    status: str | None = None,
     service: PaymentService = Depends(get_payment_service),
 ) -> list[Payment]:
-    return await service.list_all(car_id=car_id, type=type, date_from=date_from, date_to=date_to)
+    return await service.list_all(
+        car_id=car_id, type=type, date_from=date_from, date_to=date_to, status=status
+    )
 
 
 @router.post("", response_model=PaymentRead, status_code=status.HTTP_201_CREATED)

@@ -7,11 +7,16 @@ records, shown as pie and bar charts.
 
 ## Calculation
 ```
-revenue = sum(payments.amount where type = 'monthly_fair')
-        - sum(payments.amount where type in ('service', 'document', 'other'))
+revenue = sum(payments.amount where type = 'monthly_fair' and status = 'paid')
+        - sum(payments.amount where type in ('service', 'document', 'fuel', 'other') and status = 'paid')
 ```
 - `type = monthly_fair` → added to revenue (income).
-- `type = service | document | other` → deducted from revenue (expense).
+- `type = service | document | fuel | other` → deducted from revenue (expense).
+- **Cash-basis, not accrual** (added 2026-08-01, see `docs/decisions.md`):
+  only `status = 'paid'` payments are included at all — an `unpaid`
+  payment (e.g. a freshly auto-created Maintenance/Fuel/Car Doc/Lease
+  stub, see [Payment](07-payment.md)) does not affect any total until it's
+  marked paid.
 
 ## API Endpoints
 - `GET /api/v1/revenue` — aggregated report, computed on the fly from

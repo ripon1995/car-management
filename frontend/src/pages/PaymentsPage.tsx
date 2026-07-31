@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { PaymentsIcon, PlusIcon, ViewIcon, EditIcon, DeleteIcon } from '../components/NavIcons'
+import { PaymentsIcon, PlusIcon, ViewIcon, EditIcon, DeleteIcon, CheckIcon } from '../components/NavIcons'
 import ErrorDialog from '../components/ErrorDialog'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { ApiError } from '../errors/api'
 import * as api from '../api'
-import { PAYMENT_TYPES, type Payment, type PaymentInput } from '../types/payment'
+import { MANUAL_PAYMENT_TYPES, PAYMENT_TYPES, type Payment, type PaymentInput } from '../types/payment'
 import { carDisplayLabel, type Car } from '../types/car'
 import type { MaintenanceRecord } from '../types/maintenance'
 import type { CarDoc } from '../types/carDoc'
@@ -12,6 +12,7 @@ import type { FuelRecord } from '../types/fuel'
 import type { Lease } from '../types/lease'
 import type { Vendor } from '../types/vendor'
 import Loader from '../components/Loader'
+import MarkPaidDialog, { type MarkPaidUpdates } from '../components/MarkPaidDialog'
 import './PaymentsPage.css'
 
 const todayIso = new Date().toISOString().slice(0, 10)
@@ -60,7 +61,7 @@ function fuelRecordLabel(record: FuelRecord) {
 }
 
 const emptyForm: PaymentInput = {
-  type: 'monthly_fair',
+  type: 'other',
   associated_maintenance: null,
   associated_cardocs: null,
   associated_fuel: null,
@@ -70,6 +71,7 @@ const emptyForm: PaymentInput = {
   payment_date: todayIso,
   paid_by: '',
   paid_to: '',
+  status: 'paid',
   description: '',
 }
 
@@ -94,6 +96,8 @@ function PaymentsPage() {
   const [viewingPayment, setViewingPayment] = useState<Payment | null>(null)
   const [pendingDelete, setPendingDelete] = useState<Payment | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [markPaidPayment, setMarkPaidPayment] = useState<Payment | null>(null)
+  const [isMarkingPaid, setIsMarkingPaid] = useState(false)
   const paidByInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -184,6 +188,7 @@ function PaymentsPage() {
       payment_date: payment.payment_date,
       paid_by: payment.paid_by,
       paid_to: payment.paid_to,
+      status: payment.status,
       description: payment.description ?? '',
     })
     setIsFormOpen(true)
@@ -269,6 +274,31 @@ function PaymentsPage() {
     }
   }
 
+  async function confirmMarkPaid(updates: MarkPaidUpdates) {
+    if (!markPaidPayment) return
+    setIsMarkingPaid(true)
+    try {
+      const payload: PaymentInput = {
+        type: markPaidPayment.type,
+        associated_maintenance: markPaidPayment.associated_maintenance,
+        associated_cardocs: markPaidPayment.associated_cardocs,
+        associated_fuel: markPaidPayment.associated_fuel,
+        associated_lease: markPaidPayment.associated_lease,
+        car_id: markPaidPayment.car_id,
+        amount: markPaidPayment.amount,
+        description: markPaidPayment.description,
+        ...updates,
+      }
+      const updated = await api.updatePayment(markPaidPayment.id, payload)
+      setPayments((prev) => prev.map((payment) => (payment.id === updated.id ? updated : payment)))
+      setMarkPaidPayment(null)
+    } catch (err) {
+      setError(toApiError(err))
+    } finally {
+      setIsMarkingPaid(false)
+    }
+  }
+
   function linkedIds(select: (payment: Payment) => string | null) {
     return new Set(
       payments
@@ -328,7 +358,7 @@ function PaymentsPage() {
                 onChange={(event) => handleTypeChange(event.target.value as PaymentInput['type'])}
                 required
               >
-                {PAYMENT_TYPES.map((type) => (
+                {(editingId ? PAYMENT_TYPES : MANUAL_PAYMENT_TYPES).map((type) => (
                   <option key={type} value={type}>
                     {typeLabels[type]}
                   </option>
@@ -544,6 +574,14 @@ function PaymentsPage() {
                 <dd>{viewingPayment.amount}</dd>
               </div>
               <div>
+                <dt>Status</dt>
+                <dd>
+                  <span className={`status-badge ${viewingPayment.status}`}>
+                    {viewingPayment.status === 'paid' ? 'Paid' : 'Unpaid'}
+                  </span>
+                </dd>
+              </div>
+              <div>
                 <dt>Payment date</dt>
                 <dd>{viewingPayment.payment_date}</dd>
               </div>
@@ -596,6 +634,7 @@ function PaymentsPage() {
                 <th>Payment date</th>
                 <th>Paid by</th>
                 <th>Paid to</th>
+                <th>Status</th>
                 <th>Action</th>
               </tr>
             </thead>
@@ -609,6 +648,11 @@ function PaymentsPage() {
                   <td>{payment.payment_date}</td>
                   <td>{payment.paid_by}</td>
                   <td>{payment.paid_to}</td>
+                  <td>
+                    <span className={`status-badge ${payment.status}`}>
+                      {payment.status === 'paid' ? 'Paid' : 'Unpaid'}
+                    </span>
+                  </td>
                   <td className="data-table-actions">
                     <button
                       type="button"
@@ -628,6 +672,17 @@ function PaymentsPage() {
                     >
                       <EditIcon />
                     </button>
+                    {payment.status === 'unpaid' && (
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        aria-label="Mark payment as paid"
+                        title="Mark as paid"
+                        onClick={() => setMarkPaidPayment(payment)}
+                      >
+                        <CheckIcon />
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="icon-btn danger"
@@ -651,6 +706,16 @@ function PaymentsPage() {
         isConfirming={isDeleting}
         onConfirm={confirmDelete}
         onCancel={() => setPendingDelete(null)}
+      />
+
+      <MarkPaidDialog
+        open={markPaidPayment !== null}
+        payment={markPaidPayment}
+        carLabel={markPaidPayment ? carLabel(markPaidPayment.car_id) : ''}
+        typeLabel={markPaidPayment ? typeLabels[markPaidPayment.type] : ''}
+        isSaving={isMarkingPaid}
+        onSave={confirmMarkPaid}
+        onCancel={() => setMarkPaidPayment(null)}
       />
 
       <ErrorDialog error={error} onClose={() => setError(null)} />

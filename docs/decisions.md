@@ -63,18 +63,60 @@ shape as `0012`; `0013` had to precede it since the new FK targets the
 `enrollments` table. `0017` renames `enrollments` → `leases` and
 `associated_enrollment` → `associated_lease` (the rename described above).
 
-## Payment auto-creation: resolved as manual, not automatic
+## Payment auto-creation: manual → automatic, plus a Paid/Unpaid status and the Income page (2026-08-01)
 
-Maintenance and Car Docs do **not** auto-create their linked Payment row —
-that was an open question in the original feature docs (`05-maintenance.md`
-/`07-payment.md`), resolved as: Payments are created manually/independently
-on the Payments page, matching the plain-CRUD pattern of every other
-feature (user's explicit call). Fuel's Payment linkage (`associated_fuel`)
-was added later under the same manual-only rule, re-confirmed with the
-user rather than assumed. Lease's linkage is also manual — the *bulk*
-"generate due payments" action (`POST /{id}/generate-payments`) is a
-user-triggered click, not a scheduler. Don't add auto-creation for any of
-these without re-confirming with the user first.
+Maintenance and Car Docs originally did **not** auto-create their linked
+Payment row — that was an open question in the original feature docs
+(`05-maintenance.md`/`07-payment.md`), first resolved as: Payments are
+created manually/independently on the Payments page, matching the
+plain-CRUD pattern of every other feature (user's explicit call). Fuel's
+Payment linkage (`associated_fuel`) was added later under the same
+manual-only rule, re-confirmed with the user rather than assumed. Lease's
+linkage was also manual — the *bulk* "generate due payments" action
+(`POST /{id}/generate-payments`) was a user-triggered click surfaced
+inside `LeasesPage.tsx`'s view modal, not a scheduler.
+
+This was **reversed on 2026-08-01**, on direct user instruction: creating
+a Maintenance/Car Docs/Fuel record now auto-creates its linked Payment,
+and "Monthly fare" moved out of the Payments page entirely into a new,
+frontend-only Income page. Reversing it required three follow-on design
+decisions, each explicitly confirmed with the user rather than assumed
+(the previous manual-only rule had been "don't change without
+re-confirming," and the re-confirmation happened):
+
+1. **A `status` column on `payments`** (`paid`/`unpaid`, migration
+   `0018`). Without it, an auto-created payment would be indistinguishable
+   from a real, already-happened money movement. Auto-created and
+   lease-generated payments start `unpaid`; manually-created ones (and all
+   pre-existing rows, via the migration's `server_default="paid"`) default
+   to `paid`. A payment is flipped `paid` via a new shared
+   `MarkPaidDialog.tsx` component, used from both `PaymentsPage.tsx` and
+   the new `IncomePage.tsx`.
+2. **Revenue went cash-basis.** Once `unpaid` payments could exist,
+   whether they should count toward `total_income`/`total_expense`
+   immediately (accrual) or only once actually paid (cash) was ambiguous
+   and asked directly — the user chose cash-basis: `RevenueService.
+   get_summary()` now filters to `status="paid"` before aggregating.
+3. **The delete-block on Maintenance/Car Docs/Fuel had to change.**
+   Before auto-creation, a record with *any* linked Payment couldn't be
+   deleted (`ConflictException`) — a real invariant when Payments were
+   opt-in. Once every new record *always* has a linked Payment, that rule
+   would have made every Maintenance/Car Docs/Fuel record permanently
+   undeletable unless its Payment was deleted first, every time. Flagged
+   to the user before building, who chose: block deletion only when the
+   linked Payment is already `paid` (real financial history); an `unpaid`
+   linked payment (a pending stub) is deleted along with the record
+   instead of blocking it.
+
+The Income page (`IncomePage.tsx`, `/income`, nav entry between Leases and
+Vendors) has **no backend feature package of its own** — no model, no
+migration, no router. It's a computed view over the existing Lease
+(`getDuePayments`/`generateDuePayments`) and Payment endpoints, replacing
+the "Payment status" section that used to live inside `LeasesPage.tsx`'s
+view modal (removed as part of this same change, per the user's explicit
+"replace, don't supplement" call). See `CLAUDE.md`'s Backend/Frontend
+architecture sections for the resulting conventions — this section is only
+the "why."
 
 ## Frontend form-field labeling: why placeholder-only fields were removed
 

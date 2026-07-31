@@ -30,7 +30,9 @@ class RevenueService:
         date_from: date | None = None,
         date_to: date | None = None,
     ) -> RevenueSummary:
-        payments = await self.repository.list_all(car_id=car_id, date_from=date_from, date_to=date_to)
+        payments = await self.repository.list_all(
+            car_id=car_id, date_from=date_from, date_to=date_to, status="paid"
+        )
 
         total_income = Decimal("0")
         total_expense = Decimal("0")

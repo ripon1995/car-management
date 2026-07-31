@@ -133,6 +133,7 @@ class LeaseService:
                 paid_by=vendor.name,
                 paid_to=owner.name,
                 associated_lease=lease.id,
+                status="unpaid",
             )
             created.append(payment)
         return created

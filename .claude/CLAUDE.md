@@ -17,17 +17,26 @@ login, full CRUD for every feature except the read-only Revenue
 aggregation endpoint. Frontend: Vite + React + TypeScript, routing, auth
 pages, nav shell, a page per feature to the same conventions (see
 "Frontend architecture" below), plus the Revenue dashboard at `/dashboard`
-(`DashboardPage.tsx`) with hand-rolled SVG donut/bar charts.
+(`DashboardPage.tsx`) with hand-rolled SVG donut/bar charts, plus an 11th
+page, **Income** (`/income`, `IncomePage.tsx`), which is frontend-only —
+no `app/features/income/` package, no model, no migration; it's composed
+entirely from the existing Lease and Payment endpoints (see the Payments
+bullet below and `docs/decisions.md`).
 
 Lease is the current name for what shipped as "Enrollment" — code, docs,
 and this file all say "Lease" throughout; migrations `0013`–`0016` still
 say "enrollment" in their filenames/content since that was accurate at the
 time they ran (don't rename them — see `docs/decisions.md`).
 
-Maintenance, Car Docs, and Fuel do **not** auto-create a linked Payment
-row — Payments are always created manually/independently on the Payments
-page. Don't add auto-creation without re-confirming with the user (see
-`docs/decisions.md` for the resolved history on this).
+Maintenance, Car Docs, and Fuel **auto-create** a linked Payment row
+(`status = "unpaid"`) whenever a record is created — the opposite of the
+original manual-only rule. Payments carry a `status` (`paid`/`unpaid`)
+column; auto-created and lease-generated payments start `unpaid` and get
+flipped to `paid` via the frontend's "mark as paid" flow (`PUT
+/payments/{id}`), while manually-created payments default to `paid`. This
+was a deliberate reversal of the original design — see `docs/decisions.md`
+for the full history and don't re-reverse it without re-confirming with
+the user.
 
 **No unit tests in this project by explicit user instruction** — don't add
 a test suite unless asked.
@@ -184,12 +193,24 @@ cross-cutting infrastructure lives outside `app/features/`.
   `cost >= 0`; `CarDocService` validates `cost >= 0` only (`expiry_date` is
   a plain `date`, no enum). Both routers' `GET /` accept filter query
   params (`car_id`, plus `type` for Maintenance and
-  `name`/`expiring_before` for Car Docs). Both services' `delete()` block
-  with `ConflictException` if a `Payment` row references them via
-  `associated_maintenance`/`associated_cardocs` (imported inline inside
-  the method, not at module level, to avoid a circular import with
+  `name`/`expiring_before` for Car Docs). Both services' `create()`
+  auto-create a linked `Payment` row right after the record is created —
+  `type="service"`/`type="document"` respectively, `amount = cost`,
+  `payment_date = date.today()` (neither feature has its own transaction
+  date to reuse), `paid_by`/`paid_to` left as empty strings,
+  `status="unpaid"` — created directly via `PaymentRepository(self.
+  repository.db).create(...)` (inline import, bypassing `PaymentService`
+  entirely) rather than going through `POST /payments`, mirroring how
+  `LeaseService.generate_due_payments()` already creates Payments
+  directly. Both services' `delete()` fetch every linked `Payment` (via
+  `associated_maintenance`/`associated_cardocs`, inline-imported inside
+  the method — not at module level — to avoid a circular import with
   `app.features.payments.service`, which imports these two features'
-  repositories).
+  repositories) and raise `ConflictException` only if one of them is
+  already `status == "paid"`; any still-`unpaid` linked payments are
+  deleted along with the record instead of blocking it, since an unpaid
+  auto-created payment is a pending stub, not real financial history —
+  don't go back to blocking on *any* linked payment regardless of status.
 - `app/features/fuel/` — car-scoped like Maintenance/Car Docs: required FK
   `car_id` → `cars.id` validated via `CarRepository`. Fields:
   `fuel_type` (fixed tuple `octane`/`petrol`/`diesel`/`cng`/`other`,
@@ -199,10 +220,16 @@ cross-cutting infrastructure lives outside `app/features/`.
   `fuel_date` (required `date`, mirroring Payment's `payment_date`), and
   optional `description`. `GET /` filters by `car_id`, `fuel_type`, and
   `date_from`/`date_to` over `fuel_date` (same pattern as Payments).
-  `FuelService.delete()` blocks with `ConflictException` if a `Payment`
-  row references it via `associated_fuel` (inline import, same
-  avoid-circular-import reasoning as Maintenance/Car Docs above);
-  `CarService.delete()` also blocks deleting a car with fuel records.
+  `FuelService.create()` auto-creates a linked `type="fuel"` `Payment`
+  the same way Maintenance/Car Docs do, except `payment_date =
+  record.fuel_date` rather than `date.today()`, since Fuel already has a
+  real transaction date to reuse. `FuelService.delete()` fetches every
+  linked `Payment` via `associated_fuel` (inline import, same
+  avoid-circular-import reasoning as Maintenance/Car Docs above) and
+  raises `ConflictException` only if one is already `status == "paid"`,
+  deleting any still-`unpaid` ones instead of blocking — same rule as
+  Maintenance/Car Docs; `CarService.delete()` also blocks deleting a car
+  with fuel records.
 - `app/features/leases/` — a dated car↔vendor lease period: required FKs
   `car_id` → `cars.id` and `vendor_id` → `vendors.id`, plus `monthly_fare`
   (`>= 0`, lives here rather than on Vendor or Car so a re-lease at a
@@ -224,11 +251,17 @@ cross-cutting infrastructure lives outside `app/features/`.
   with `associated_lease == id` in that month; `POST
   /{id}/generate-payments` bulk-creates a `monthly_fair` Payment (linked
   via `associated_lease`) for every due month in one call, `paid_by` = the
-  vendor's name, `paid_to` = the car owner's name. Because due-months are
-  computed per-lease-record, a gap between one lease ending and the next
-  starting for the same car naturally has no due months — don't
+  vendor's name, `paid_to` = the car owner's name, `status="unpaid"` (a
+  freshly generated month hasn't actually been received yet — the
+  frontend's Income page is what flips it to `paid`). Because due-months
+  are computed per-lease-record, a gap between one lease ending and the
+  next starting for the same car naturally has no due months — don't
   reintroduce a synced `cars.vendor_id`/cron-based alternative without
-  re-confirming with the user.
+  re-confirming with the user. These two endpoints used to be surfaced
+  directly inside `LeasesPage.tsx`'s view modal; that UI was removed and
+  replaced by the frontend-only Income page (see the Frontend architecture
+  section) — the endpoints themselves are unchanged, only which page calls
+  them.
 - `app/features/payments/` — the money-movement ledger. Required FK:
   `car_id` → `cars.id`; optional FKs: `associated_maintenance` →
   `maintenance_records.id`, `associated_cardocs` → `car_docs.id`,
@@ -254,11 +287,28 @@ cross-cutting infrastructure lives outside `app/features/`.
   `LeaseService.generate_due_payments()`'s amount-from-lease behavior —
   don't reintroduce a manual `Amount` input for `monthly_fair` payments
   without re-confirming with the user. `GET /payments` filters by
-  `car_id`, `type`, and a `date_from`/`date_to` range over `payment_date`.
+  `car_id`, `type`, `status`, and a `date_from`/`date_to` range over
+  `payment_date`. `Payment.status` (`PAYMENT_STATUSES = ("paid",
+  "unpaid")` in `schemas.py`) defaults to `"paid"` both at the DB level
+  (`server_default="paid"` — existing/manually-created rows represent
+  already-settled money movements) and in `PaymentCreate` — the three
+  auto-creation paths (Maintenance/Car Docs/Fuel's `create()`, Lease's
+  `generate_due_payments()`) all bypass `PaymentCreate`/`PaymentService`
+  and pass `status="unpaid"` explicitly straight to `PaymentRepository`.
+  `PaymentService._validate_status()` mirrors `_validate_type()`'s
+  pattern. The backend's `PaymentService`/`PAYMENT_TYPES` still generically
+  accept `type="service"/"document"/"fuel"` on `POST /payments` for API
+  completeness — only the **frontend** narrows its manual-create dropdown
+  to `MANUAL_PAYMENT_TYPES = ['other']` (see Frontend architecture), since
+  service/document/fuel/monthly_fair payments are now only ever produced
+  by the auto-creation paths above.
 - `app/features/revenue/` — read-only, **no `models.py`/migration**:
   `RevenueService.get_summary()` takes the same `car_id`/date-range filters
-  as Payments (via `PaymentRepository.list_all()`), fetches the matching
-  Payment rows, and aggregates them in Python (not SQL) into
+  as Payments (via `PaymentRepository.list_all()`, additionally passing
+  `status="paid"` — Revenue is **cash-basis**: `unpaid` payments are
+  excluded from every total until marked paid, not counted on an accrual
+  basis), fetches the matching Payment rows, and aggregates them in Python
+  (not SQL) into
   `total_income`/`total_expense`/`net_revenue`, a `by_type` breakdown, a
   `by_period` breakdown (grouped by `payment_date.strftime("%Y-%m")`), and
   a `by_car` breakdown that's `null` whenever a single `car_id` is
@@ -310,26 +360,42 @@ maps to `src/pages/CarOwnersPage.tsx` + `src/api/carOwners.ts` +
 layout. `FuelPage.tsx` at `/fuel` (nav entry between Maintenance and Car
 Docs) is copied directly from `MaintenancePage.tsx`'s modal-form/data-table/
 view-modal structure, and `LeasesPage.tsx` at `/leases` (nav entry between
-Cars and Vendors) is copied from `FuelPage.tsx`'s structure, with one
-addition: its view modal fetches `GET /leases/{id}/due-payments` on open
-and renders a small "Payment status" section (`due_months`/
-`generated_months`) with a "Generate due payments" button when
-`due_months` is non-empty — a light addition inside the existing
-view-modal shell, not a new page section. Its create form only lets
-`car_id`/`vendor_id` be chosen when creating a new lease (`editingId` is
-falsy); editing an existing one shows them as read-only text instead,
-since `LeaseUpdate` on the backend doesn't accept those two fields —
-reassigning a car to a different vendor means ending the current lease and
-creating a new one, not editing one in place. (This page/route/module was
-originally named "Enrollment" — see `docs/decisions.md`.)
+Cars and Vendors) is copied from `FuelPage.tsx`'s structure. Its create
+form only lets `car_id`/`vendor_id` be chosen when creating a new lease
+(`editingId` is falsy); editing an existing one shows them as read-only
+text instead, since `LeaseUpdate` on the backend doesn't accept those two
+fields — reassigning a car to a different vendor means ending the current
+lease and creating a new one, not editing one in place. (This page/route/
+module was originally named "Enrollment" — see `docs/decisions.md`.)
+`LeasesPage.tsx` no longer surfaces due/generated-month payment status
+itself — it originally had a "Payment status" section with a "Generate due
+payments" button embedded in its view modal, but that was removed and
+replaced by the dedicated `IncomePage.tsx` described below (see
+`docs/decisions.md` for why).
 
-Revenue is the one exception, since it's a read-only dashboard rather than
-a CRUD resource: it's `src/pages/DashboardPage.tsx` (mounted at the
+Revenue and Income are both read-only/composed pages rather than CRUD
+resources. Revenue is `src/pages/DashboardPage.tsx` (mounted at the
 existing `/dashboard` route/nav entry, not a new `/revenue` route) +
 `src/api/revenue.ts` + `src/types/revenue.ts`, and its filter controls
 (`car_id`/`from`/`to`, mapping to `GET /revenue`'s query params) sit in
 `.page-header`'s right-hand slot in place of the usual `.btn-primary`
-create button, since there's nothing to create.
+create button, since there's nothing to create. Income is
+`src/pages/IncomePage.tsx` at `/income` (nav entry between Leases and
+Vendors) — it has **no backend feature package of its own**; it's a
+computed view built entirely from `listLeases()`, `listCars()`,
+`listVendors()`, `listPayments({ type: 'monthly_fair' })`, and a
+per-lease `getDuePayments(lease.id)` call (the same Lease endpoints
+`LeasesPage.tsx` used to call directly, see above). It derives one row
+per (lease, month) from the union of each lease's `due_months`/
+`generated_months`, resolving generated months to their real `Payment`
+(for `status`/`id`/`amount`) and rendering due-but-not-yet-generated
+months as synthetic "Not received" rows. Clicking a "Not received" row's
+action either opens the shared `MarkPaidDialog` directly (already
+generated, still `unpaid`) or first calls `POST
+/leases/{id}/generate-payments` (bulk — generates every due month for
+that lease, not just the clicked one) and then opens the dialog for the
+newly-created payment matching that month — accepted as a minor UX
+side-effect rather than adding a per-month generate endpoint.
 
 - `src/api/client.ts` — `request<T>(path, options)` (fetch wrapper: base
   URL, JSON headers, error → `ApiError` mapping, 401 →
@@ -381,6 +447,17 @@ create button, since there's nothing to create.
   `.auth-form-overlay` absolutely positioned over `.auth-form`, same
   shape as `.confirm-dialog-overlay`, shown while `isSubmitting`), but
   not for page-level list "Loading…" states, which stay plain text.
+- **Mark-paid dialog:** `src/components/MarkPaidDialog.tsx` is the second
+  truly-shared (not per-page-duplicated) modal, alongside `ConfirmDialog`
+  — used verbatim by both `PaymentsPage.tsx` and `IncomePage.tsx` to flip
+  an `unpaid` Payment to `paid`. Standard `.modal-backdrop`/
+  `.modal-panel.card`/`.form-field` shell; read-only Amount/Car/Type plus
+  editable `status`/`paid_by`/`paid_to`/`payment_date` fields, seeded from
+  the target `Payment` prop via a `useEffect` keyed on `payment?.id`. Both
+  call sites build a full `PaymentInput` (spreading the source payment's
+  other fields, not a partial) before `api.updatePayment(id, ...)`, since
+  `updatePayment` takes the complete shape. Reuse this component rather
+  than duplicating the status-change form per page.
 - Shared page-chrome classes live in `App.css` (global, not per-page) since
   every feature page reuses them — add new cross-page primitives there,
   not in a page's own CSS file:
@@ -394,6 +471,12 @@ create button, since there's nothing to create.
     `"Add car owner"`). Reuse for every page's main create action.
   - `.card` — generic surface (`var(--surface)` bg, border, shadow,
     rounded corners) for panels/tables/detail views.
+  - `.status-badge` (plus `.paid`/`.unpaid` modifiers, using the existing
+    `--status-good`/`--status-critical` token pairs) — the Paid/Unpaid and
+    Received/Not received pill used by both `PaymentsPage.tsx`'s table/
+    view modal and `IncomePage.tsx`'s table. Added as a cross-page
+    primitive here rather than in either page's own CSS file, same
+    reasoning as `.page-header`/`.btn-primary`/`.card`.
 - List pages render records in a full-width `<table className="data-table">`
   wrapped in `<div className="data-table-wrap card">` — both classes are
   shared in `App.css`, not per-feature CSS. `.data-table` rows get a
@@ -493,7 +576,20 @@ create button, since there's nothing to create.
   `<input>` is hidden outright (not shown read-only) whenever `type ===
   'monthly_fair'`, since `PaymentService` derives and overwrites `amount`
   from the linked Lease server-side regardless of what's submitted — don't
-  reintroduce it without asking.
+  reintroduce it without asking. The **create** form's Type `<select>`
+  only iterates `MANUAL_PAYMENT_TYPES` (`['other']`, from
+  `src/types/payment.ts`) rather than the full `PAYMENT_TYPES` — service/
+  document/fuel/monthly_fair payments are now exclusively produced by
+  auto-creation (Maintenance/Car Docs/Fuel/Income), so manual creation on
+  this page is `other`-only; the **edit** form still iterates the full
+  `PAYMENT_TYPES` list, since existing rows of any type can land here.
+  The table has a `Status` column (`.status-badge`) and, for any row with
+  `status === 'unpaid'`, a "mark as paid" `.icon-btn` (`CheckIcon` from
+  `NavIcons.tsx`) that opens the shared `MarkPaidDialog` (see the
+  Mark-paid dialog bullet above) instead of the usual edit form —
+  `confirmMarkPaid()` builds a full `PaymentInput` from the target payment
+  plus the dialog's updates and calls `api.updatePayment`, same
+  try/finally shape as `confirmDelete()`.
 - `CarDocsPage.tsx` colors an already-past `expiry_date` cell with
   `.expired` (`var(--status-critical)`, defined in the page's own CSS
   file rather than `App.css` since no other feature needs it yet) — a
@@ -548,15 +644,21 @@ specific cars for specific periods at a per-period fare, and a returned car
 has a gap where no fare accrues until it's re-leased. **Maintenance** and
 **Car Docs** are car-scoped records for servicing and document tracking
 respectively. **Payment** is the single ledger of all money movements for a
-car (`type`: `service`, `document`, `fuel`, `monthly_fair`, `other`),
-optionally linked back to the Maintenance/CarDocs/Fuel record that
-generated it — except `monthly_fair`, whose link to a Lease is
-**mandatory**, and whose `amount` is always derived from that Lease's
-`monthly_fare` rather than entered by hand. **Revenue** has no table of its
-own — it is a dashboard computed on the fly from Payment records:
-`monthly_fair` payments count as income, every other type is deducted as
-expense. None of this connects to **Auth** — `users` is an isolated login
-identity gating access to the whole API; there's no ownership/role model.
+car (`type`: `service`, `document`, `fuel`, `monthly_fair`, `other`;
+`status`: `paid`/`unpaid`), optionally linked back to the
+Maintenance/CarDocs/Fuel record that generated it — except `monthly_fair`,
+whose link to a Lease is **mandatory**, and whose `amount` is always
+derived from that Lease's `monthly_fare` rather than entered by hand.
+Creating a Maintenance/Car Docs/Fuel record auto-creates its linked
+Payment as `unpaid`; a Lease's due months are turned into `unpaid`
+`monthly_fair` Payments via the Income page; either is flipped to `paid`
+through a "mark as paid" action once the money actually moves. **Revenue**
+has no table of its own — it is a cash-basis dashboard computed on the fly
+from `paid` Payment records only (`unpaid` ones are excluded from every
+total until marked paid): `monthly_fair` payments count as income, every
+other type is deducted as expense. None of this connects to **Auth** —
+`users` is an isolated login identity gating access to the whole API;
+there's no ownership/role model.
 
 ### Conventions (see `00-overview.md` for full detail)
 - Every table: `id` (UUID PK), `created_at`, `updated_at`.

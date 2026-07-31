@@ -2,10 +2,11 @@ import uuid
 
 from fastapi import APIRouter, Depends, status
 
+from app.core.dependencies import get_car_owner_service
 from app.features.auth.dependencies import get_current_user
 from app.features.car_owners.models import CarOwner
 from app.features.car_owners.schemas import CarOwnerCreate, CarOwnerRead, CarOwnerUpdate
-from app.features.car_owners.service import CarOwnerService, get_car_owner_service
+from app.features.car_owners.service import CarOwnerService
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 

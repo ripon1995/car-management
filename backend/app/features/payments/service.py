@@ -2,11 +2,7 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
-from fastapi import Depends
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.core.exceptions import NotFoundException, ValidationException
-from app.db.session import get_db
 from app.features.car_docs.repository import CarDocRepository
 from app.features.cars.repository import CarRepository
 from app.features.fuel.repository import FuelRepository
@@ -171,13 +167,3 @@ class PaymentService:
             and await self.fuel_repository.get_by_id(associated_fuel) is None
         ):
             raise NotFoundException(f"Fuel record {associated_fuel} not found")
-
-
-def get_payment_service(db: AsyncSession = Depends(get_db)) -> PaymentService:
-    return PaymentService(
-        PaymentRepository(db),
-        CarRepository(db),
-        MaintenanceRepository(db),
-        CarDocRepository(db),
-        FuelRepository(db),
-    )

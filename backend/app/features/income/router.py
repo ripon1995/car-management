@@ -3,10 +3,11 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, status
 
+from app.core.dependencies import get_income_service
 from app.features.auth.dependencies import get_current_user
 from app.features.income.models import Income
 from app.features.income.schemas import IncomeCreate, IncomeRead, IncomeUpdate
-from app.features.income.service import IncomeService, get_income_service
+from app.features.income.service import IncomeService
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 

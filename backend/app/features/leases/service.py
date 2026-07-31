@@ -2,12 +2,7 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
-from fastapi import Depends
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.core.exceptions import ConflictException, NotFoundException, ValidationException
-from app.db.session import get_db
 from app.features.car_owners.repository import CarOwnerRepository
 from app.features.cars.repository import CarRepository
 from app.features.income.repository import IncomeRepository
@@ -88,27 +83,20 @@ class LeaseService:
 
     async def delete(self, lease_id: uuid.UUID) -> None:
         lease = await self.get_by_id(lease_id)
-        from app.features.income.models import Income
-
-        linked_income = await self.repository.db.scalar(
-            select(Income.id).where(Income.lease_id == lease_id).limit(1)
-        )
-        if linked_income is not None:
+        linked_income = await self.income_repository.list_all(lease_id=lease_id)
+        if linked_income:
             raise ConflictException("Cannot delete a lease that has linked income")
         await self.repository.delete(lease)
 
     async def get_due_payments(self, lease_id: uuid.UUID) -> DuePaymentsRead:
         lease = await self.get_by_id(lease_id)
-        from app.features.income.models import Income
 
         today = date.today()
         effective_end = min(lease.end_date, today) if lease.end_date else today
         all_months = _month_range(lease.start_date, effective_end)
 
-        result = await self.repository.db.scalars(
-            select(Income.payment_date).where(Income.lease_id == lease_id)
-        )
-        generated_months = sorted({payment_date.strftime("%Y-%m") for payment_date in result.all()})
+        income_rows = await self.income_repository.list_all(lease_id=lease_id)
+        generated_months = sorted({row.payment_date.strftime("%Y-%m") for row in income_rows})
         due_months = [month for month in all_months if month not in generated_months]
         return DuePaymentsRead(due_months=due_months, generated_months=generated_months)
 
@@ -161,13 +149,3 @@ class LeaseService:
             raise ConflictException(
                 "Car already has an active lease; end it before starting a new one"
             )
-
-
-def get_lease_service(db: AsyncSession = Depends(get_db)) -> LeaseService:
-    return LeaseService(
-        LeaseRepository(db),
-        CarRepository(db),
-        VendorRepository(db),
-        CarOwnerRepository(db),
-        IncomeRepository(db),
-    )

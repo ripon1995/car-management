@@ -2,10 +2,11 @@ import uuid
 
 from fastapi import APIRouter, Depends, status
 
+from app.core.dependencies import get_driver_service
 from app.features.auth.dependencies import get_current_user
 from app.features.drivers.models import Driver
 from app.features.drivers.schemas import DriverCreate, DriverRead, DriverUpdate
-from app.features.drivers.service import DriverService, get_driver_service
+from app.features.drivers.service import DriverService
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 

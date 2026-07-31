@@ -1,11 +1,7 @@
 import uuid
 from datetime import date
 
-from fastapi import Depends
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.core.exceptions import NotFoundException, ValidationException
-from app.db.session import get_db
 from app.features.income.models import Income
 from app.features.income.repository import IncomeRepository
 from app.features.income.schemas import INCOME_STATUSES, IncomeCreate, IncomeUpdate
@@ -76,7 +72,3 @@ class IncomeService:
     def _validate_status(status: str) -> None:
         if status not in INCOME_STATUSES:
             raise ValidationException(f"status must be one of {', '.join(INCOME_STATUSES)}")
-
-
-def get_income_service(db: AsyncSession = Depends(get_db)) -> IncomeService:
-    return IncomeService(IncomeRepository(db), LeaseRepository(db))

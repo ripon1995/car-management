@@ -1,11 +1,8 @@
 import uuid
 
-from fastapi import Depends
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import ConflictException, NotFoundException
-from app.db.session import get_db
 from app.features.leases.models import Lease
 from app.features.vendors.models import Vendor
 from app.features.vendors.repository import VendorRepository
@@ -43,7 +40,3 @@ class VendorService:
         if referenced is not None:
             raise ConflictException("Cannot delete a vendor referenced by one or more leases")
         await self.repository.delete(vendor)
-
-
-def get_vendor_service(db: AsyncSession = Depends(get_db)) -> VendorService:
-    return VendorService(VendorRepository(db))

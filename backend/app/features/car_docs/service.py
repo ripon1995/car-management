@@ -2,24 +2,26 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
-from fastapi import Depends
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.core.exceptions import ConflictException, NotFoundException, ValidationException
-from app.db.session import get_db
 from app.features.car_docs.models import CarDoc
 from app.features.car_docs.repository import CarDocRepository
 from app.features.car_docs.schemas import DOC_TYPES, CarDocCreate, CarDocUpdate
 from app.features.cars.repository import CarRepository
+from app.features.payments.repository import PaymentRepository
 
 
 class CarDocService:
     """Business logic for creating/managing car docs."""
 
-    def __init__(self, repository: CarDocRepository, car_repository: CarRepository) -> None:
+    def __init__(
+        self,
+        repository: CarDocRepository,
+        car_repository: CarRepository,
+        payment_repository: PaymentRepository,
+    ) -> None:
         self.repository = repository
         self.car_repository = car_repository
+        self.payment_repository = payment_repository
 
     async def create(self, payload: CarDocCreate) -> CarDoc:
         self._validate_doc_type(payload.doc_type)
@@ -27,9 +29,7 @@ class CarDocService:
         await self._validate_car(payload.car_id)
         car_doc = await self.repository.create(**payload.model_dump())
 
-        from app.features.payments.repository import PaymentRepository
-
-        await PaymentRepository(self.repository.db).create(
+        await self.payment_repository.create(
             type="document",
             car_id=car_doc.car_id,
             associated_cardocs=car_doc.id,
@@ -79,19 +79,11 @@ class CarDocService:
 
     async def delete(self, car_doc_id: uuid.UUID) -> None:
         car_doc = await self.get_by_id(car_doc_id)
-        from app.features.payments.models import Payment
-        from app.features.payments.repository import PaymentRepository
-
-        linked = list(
-            await self.repository.db.scalars(
-                select(Payment).where(Payment.associated_cardocs == car_doc_id)
-            )
-        )
+        linked = await self.payment_repository.list_by_cardoc(car_doc_id)
         if any(payment.status == "paid" for payment in linked):
             raise ConflictException("Cannot delete a car doc that has a paid linked payment")
-        payment_repository = PaymentRepository(self.repository.db)
         for payment in linked:
-            await payment_repository.delete(payment)
+            await self.payment_repository.delete(payment)
         await self.repository.delete(car_doc)
 
     @staticmethod
@@ -107,7 +99,3 @@ class CarDocService:
     async def _validate_car(self, car_id: uuid.UUID) -> None:
         if await self.car_repository.get_by_id(car_id) is None:
             raise NotFoundException(f"Car {car_id} not found")
-
-
-def get_car_doc_service(db: AsyncSession = Depends(get_db)) -> CarDocService:
-    return CarDocService(CarDocRepository(db), CarRepository(db))

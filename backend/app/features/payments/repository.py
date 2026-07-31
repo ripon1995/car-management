@@ -17,6 +17,24 @@ class PaymentRepository:
     async def get_by_id(self, payment_id: uuid.UUID) -> Payment | None:
         return await self.db.get(Payment, payment_id)
 
+    async def list_by_maintenance(self, maintenance_id: uuid.UUID) -> list[Payment]:
+        result = await self.db.scalars(
+            select(Payment).where(Payment.associated_maintenance == maintenance_id)
+        )
+        return list(result.all())
+
+    async def list_by_cardoc(self, car_doc_id: uuid.UUID) -> list[Payment]:
+        result = await self.db.scalars(
+            select(Payment).where(Payment.associated_cardocs == car_doc_id)
+        )
+        return list(result.all())
+
+    async def list_by_fuel(self, fuel_id: uuid.UUID) -> list[Payment]:
+        result = await self.db.scalars(
+            select(Payment).where(Payment.associated_fuel == fuel_id)
+        )
+        return list(result.all())
+
     async def list_all(
         self,
         car_id: uuid.UUID | None = None,

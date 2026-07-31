@@ -2,24 +2,26 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
-from fastapi import Depends
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.core.exceptions import ConflictException, NotFoundException, ValidationException
-from app.db.session import get_db
 from app.features.cars.repository import CarRepository
 from app.features.fuel.models import FuelRecord
 from app.features.fuel.repository import FuelRepository
 from app.features.fuel.schemas import FUEL_TYPES, FuelCreate, FuelUpdate
+from app.features.payments.repository import PaymentRepository
 
 
 class FuelService:
     """Business logic for creating/managing fuel records."""
 
-    def __init__(self, repository: FuelRepository, car_repository: CarRepository) -> None:
+    def __init__(
+        self,
+        repository: FuelRepository,
+        car_repository: CarRepository,
+        payment_repository: PaymentRepository,
+    ) -> None:
         self.repository = repository
         self.car_repository = car_repository
+        self.payment_repository = payment_repository
 
     async def create(self, payload: FuelCreate) -> FuelRecord:
         self._validate_fuel_type(payload.fuel_type)
@@ -29,9 +31,7 @@ class FuelService:
         await self._validate_car(payload.car_id)
         record = await self.repository.create(**payload.model_dump())
 
-        from app.features.payments.repository import PaymentRepository
-
-        await PaymentRepository(self.repository.db).create(
+        await self.payment_repository.create(
             type="fuel",
             car_id=record.car_id,
             associated_fuel=record.id,
@@ -80,19 +80,11 @@ class FuelService:
 
     async def delete(self, fuel_id: uuid.UUID) -> None:
         record = await self.get_by_id(fuel_id)
-        from app.features.payments.models import Payment
-        from app.features.payments.repository import PaymentRepository
-
-        linked = list(
-            await self.repository.db.scalars(
-                select(Payment).where(Payment.associated_fuel == fuel_id)
-            )
-        )
+        linked = await self.payment_repository.list_by_fuel(fuel_id)
         if any(payment.status == "paid" for payment in linked):
             raise ConflictException("Cannot delete a fuel record that has a paid linked payment")
-        payment_repository = PaymentRepository(self.repository.db)
         for payment in linked:
-            await payment_repository.delete(payment)
+            await self.payment_repository.delete(payment)
         await self.repository.delete(record)
 
     @staticmethod
@@ -118,7 +110,3 @@ class FuelService:
     async def _validate_car(self, car_id: uuid.UUID) -> None:
         if await self.car_repository.get_by_id(car_id) is None:
             raise NotFoundException(f"Car {car_id} not found")
-
-
-def get_fuel_service(db: AsyncSession = Depends(get_db)) -> FuelService:
-    return FuelService(FuelRepository(db), CarRepository(db))

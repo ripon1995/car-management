@@ -3,10 +3,11 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, status
 
+from app.core.dependencies import get_car_doc_service
 from app.features.auth.dependencies import get_current_user
 from app.features.car_docs.models import CarDoc
 from app.features.car_docs.schemas import CarDocCreate, CarDocRead, CarDocUpdate
-from app.features.car_docs.service import CarDocService, get_car_doc_service
+from app.features.car_docs.service import CarDocService
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 

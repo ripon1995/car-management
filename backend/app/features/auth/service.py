@@ -1,11 +1,7 @@
 import uuid
 
-from fastapi import Depends
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.core.exceptions import AuthenticationException, ConflictException
 from app.core.security import hash_password, verify_password
-from app.db.session import get_db
 from app.features.auth.models import User
 from app.features.auth.repository import UserRepository
 from app.features.auth.schemas import UserCreate
@@ -34,7 +30,3 @@ class AuthService:
 
     async def get_by_id(self, user_id: uuid.UUID) -> User | None:
         return await self.repository.get_by_id(user_id)
-
-
-def get_auth_service(db: AsyncSession = Depends(get_db)) -> AuthService:
-    return AuthService(UserRepository(db))

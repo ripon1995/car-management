@@ -3,10 +3,6 @@ from collections import defaultdict
 from datetime import date
 from decimal import Decimal
 
-from fastapi import Depends
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.db.session import get_db
 from app.features.income.repository import IncomeRepository
 from app.features.payments.repository import PaymentRepository
 from app.features.revenue.schemas import (
@@ -95,7 +91,3 @@ class RevenueService:
                 ]
             ),
         )
-
-
-def get_revenue_service(db: AsyncSession = Depends(get_db)) -> RevenueService:
-    return RevenueService(PaymentRepository(db), IncomeRepository(db))

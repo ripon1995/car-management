@@ -3,10 +3,11 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, status
 
+from app.core.dependencies import get_fuel_service
 from app.features.auth.dependencies import get_current_user
 from app.features.fuel.models import FuelRecord
 from app.features.fuel.schemas import FuelCreate, FuelRead, FuelUpdate
-from app.features.fuel.service import FuelService, get_fuel_service
+from app.features.fuel.service import FuelService
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 

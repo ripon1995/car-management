@@ -2,6 +2,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, status
 
+from app.core.dependencies import get_lease_service
 from app.features.auth.dependencies import get_current_user
 from app.features.income.models import Income
 from app.features.income.schemas import IncomeRead
@@ -12,7 +13,7 @@ from app.features.leases.schemas import (
     LeaseRead,
     LeaseUpdate,
 )
-from app.features.leases.service import LeaseService, get_lease_service
+from app.features.leases.service import LeaseService
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 

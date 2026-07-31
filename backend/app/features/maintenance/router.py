@@ -3,10 +3,11 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, status
 
+from app.core.dependencies import get_maintenance_service
 from app.features.auth.dependencies import get_current_user
 from app.features.maintenance.models import MaintenanceRecord
 from app.features.maintenance.schemas import MaintenanceCreate, MaintenanceRead, MaintenanceUpdate
-from app.features.maintenance.service import MaintenanceService, get_maintenance_service
+from app.features.maintenance.service import MaintenanceService
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 

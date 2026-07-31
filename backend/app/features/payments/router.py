@@ -3,10 +3,11 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, status
 
+from app.core.dependencies import get_payment_service
 from app.features.auth.dependencies import get_current_user
 from app.features.payments.models import Payment
 from app.features.payments.schemas import PaymentCreate, PaymentRead, PaymentUpdate
-from app.features.payments.service import PaymentService, get_payment_service
+from app.features.payments.service import PaymentService
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 

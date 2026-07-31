@@ -2,10 +2,11 @@ import uuid
 
 from fastapi import APIRouter, Depends, status
 
+from app.core.dependencies import get_vendor_service
 from app.features.auth.dependencies import get_current_user
 from app.features.vendors.models import Vendor
 from app.features.vendors.schemas import VendorCreate, VendorRead, VendorUpdate
-from app.features.vendors.service import VendorService, get_vendor_service
+from app.features.vendors.service import VendorService
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 

@@ -5,10 +5,11 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError
 
 from app.core.config import settings
+from app.core.dependencies import get_auth_service
 from app.core.exceptions import AuthenticationException
 from app.core.security import decode_access_token
 from app.features.auth.models import User
-from app.features.auth.service import AuthService, get_auth_service
+from app.features.auth.service import AuthService
 
 
 class OAuth2Bearer(OAuth2PasswordBearer):

@@ -1,11 +1,8 @@
 import uuid
 
-from fastapi import Depends
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import ConflictException, NotFoundException
-from app.db.session import get_db
 from app.features.cars.models import Car
 from app.features.drivers.models import Driver
 from app.features.drivers.repository import DriverRepository
@@ -43,7 +40,3 @@ class DriverService:
         if assigned_cars is not None:
             raise ConflictException("Cannot delete a driver currently assigned to one or more cars")
         await self.repository.delete(driver)
-
-
-def get_driver_service(db: AsyncSession = Depends(get_db)) -> DriverService:
-    return DriverService(DriverRepository(db))

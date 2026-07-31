@@ -1,10 +1,6 @@
 import uuid
 
-from fastapi import Depends
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.core.exceptions import NotFoundException
-from app.db.session import get_db
 from app.features.car_owners.models import CarOwner
 from app.features.car_owners.repository import CarOwnerRepository
 from app.features.car_owners.schemas import CarOwnerCreate, CarOwnerUpdate
@@ -36,7 +32,3 @@ class CarOwnerService:
     async def delete(self, owner_id: uuid.UUID) -> None:
         owner = await self.get_by_id(owner_id)
         await self.repository.delete(owner)
-
-
-def get_car_owner_service(db: AsyncSession = Depends(get_db)) -> CarOwnerService:
-    return CarOwnerService(CarOwnerRepository(db))

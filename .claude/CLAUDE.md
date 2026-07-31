@@ -122,20 +122,44 @@ cross-cutting infrastructure lives outside `app/features/`.
   `RequestLoggerMiddleware` (logs method/path/status/duration per request).
 - `app/db/` — async SQLAlchemy engine/session (`asyncpg` driver) and the
   shared declarative `Base`.
+- `app/core/dependencies.py` — the single place that wires every feature's
+  repository/service dependency graph together: one `get_<feature>_repository`
+  provider per feature repository (`XRepository(db)`, `Depends(get_db)`),
+  and one `get_<feature>_service` provider per feature, composed via
+  `Depends(get_<x>_repository)` chaining rather than each feature
+  constructing its own (and its siblings') repositories inline. This
+  replaced an earlier design where every feature's own `service.py` defined
+  its own `get_<feature>_service(db = Depends(get_db))` and directly
+  imported+instantiated whichever sibling repositories it needed (and, for
+  a few cross-feature side effects, imported a sibling repository/model
+  *inside a method body* specifically to dodge a perceived circular
+  import) — restructured on direct user instruction because those inline,
+  function-body imports were considered bad practice. Verified there was no
+  actual circular-import constraint forcing them inline (moving each one to
+  module level and importing `app.main`/`app.api` end-to-end still
+  succeeds) before doing the move; don't reintroduce a feature's own
+  `get_<feature>_service` in its `service.py`, and don't reintroduce a
+  function-body-local `from app.features.<sibling>... import ...` for
+  wiring — add a provider function to this file instead, and if a service
+  needs a sibling repository for business logic (not just validation),
+  inject it via the constructor and compose it here.
 - Every feature package follows a **repository → service → router**
   layering, including Maintenance, Car Docs, and Payment:
   - `models.py` — SQLAlchemy model(s).
   - `schemas.py` — Pydantic request/response models.
   - `repository.py` — a `<Feature>Repository` class wrapping the
     `AsyncSession`: pure data access (`get_by_id`, `list_all`,
-    `create`/`update`/`delete`), no business rules.
-  - `service.py` — a `<Feature>Service` class taking the repository in its
-    constructor: business rules (uniqueness checks, 404s via
-    `NotFoundException`, etc.), plus a `get_<feature>_service(db =
-    Depends(get_db))` FastAPI dependency provider that wires the repository
-    and service together.
-  - `router.py` — HTTP layer only: depends on the service provider, no
-    direct DB/session access.
+    `create`/`update`/`delete`, plus any association-scoped list methods a
+    sibling service needs, e.g. `PaymentRepository.list_by_maintenance`/
+    `list_by_cardoc`/`list_by_fuel`), no business rules.
+  - `service.py` — a `<Feature>Service` class taking its own repository plus
+    any sibling repositories it needs as constructor args (business rules:
+    uniqueness checks, 404s via `NotFoundException`, etc.) — no
+    `get_<feature>_service` provider here anymore; that wiring lives in
+    `app/core/dependencies.py`.
+  - `router.py` — HTTP layer only: depends on `get_<feature>_service`
+    imported from `app.core.dependencies` (not from its own `service.py`),
+    no direct DB/session access.
 - `app/features/auth/` — the generic login identity, decoupled from every
   business entity:
   - `models.py` — `User` (`users` table: `id`, `email`, `password_hash`,
@@ -182,7 +206,8 @@ cross-cutting infrastructure lives outside `app/features/`.
   `vendor_id`** — a car's current vendor is derived by looking up its
   Lease with `end_date IS NULL`, not stored on the car itself. `CarService`
   takes the Car Owner and Driver repositories as constructor args (see
-  `get_car_service`, no `VendorRepository`) and validates: `model_year` is
+  `get_car_service` in `app/core/dependencies.py`, no `VendorRepository`)
+  and validates: `model_year` is
   in `[1980, current_year + 1]`; `engine_number`/`chassis_number` are
   unique (`ConflictException`, checked via
   `CarRepository.get_by_engine_number`/`get_by_chassis_number`); and that
@@ -206,15 +231,14 @@ cross-cutting infrastructure lives outside `app/features/`.
   `type="service"`/`type="document"` respectively, `amount = cost`,
   `payment_date = date.today()` (neither feature has its own transaction
   date to reuse), `paid_by`/`paid_to` left as empty strings,
-  `status="unpaid"` — created directly via `PaymentRepository(self.
-  repository.db).create(...)` (inline import, bypassing `PaymentService`
-  entirely) rather than going through `POST /payments`, mirroring how
-  `LeaseService.generate_due_payments()` already creates Payments
-  directly. Both services' `delete()` fetch every linked `Payment` (via
-  `associated_maintenance`/`associated_cardocs`, inline-imported inside
-  the method — not at module level — to avoid a circular import with
-  `app.features.payments.service`, which imports these two features'
-  repositories) and raise `ConflictException` only if one of them is
+  `status="unpaid"` — created via an injected `PaymentRepository`
+  constructor arg (`self.payment_repository.create(...)`, bypassing
+  `PaymentService` entirely) rather than going through `POST /payments`,
+  mirroring how `LeaseService.generate_due_income()` already creates
+  Income directly. Both services' `delete()` fetch every linked `Payment`
+  via the same injected `payment_repository`
+  (`list_by_maintenance`/`list_by_cardoc` on `PaymentRepository`) and raise
+  `ConflictException` only if one of them is
   already `status == "paid"`; any still-`unpaid` linked payments are
   deleted along with the record instead of blocking it, since an unpaid
   auto-created payment is a pending stub, not real financial history —
@@ -232,8 +256,9 @@ cross-cutting infrastructure lives outside `app/features/`.
   the same way Maintenance/Car Docs do, except `payment_date =
   record.fuel_date` rather than `date.today()`, since Fuel already has a
   real transaction date to reuse. `FuelService.delete()` fetches every
-  linked `Payment` via `associated_fuel` (inline import, same
-  avoid-circular-import reasoning as Maintenance/Car Docs above) and
+  linked `Payment` via the same injected `payment_repository` pattern
+  (`PaymentRepository.list_by_fuel`, see the Maintenance/Car Docs bullet
+  above) and
   raises `ConflictException` only if one is already `status == "paid"`,
   deleting any still-`unpaid` ones instead of blocking — same rule as
   Maintenance/Car Docs; `CarService.delete()` also blocks deleting a car
@@ -249,8 +274,9 @@ cross-cutting infrastructure lives outside `app/features/`.
   current one (via `PUT {"end_date": ...}`) is required before starting
   another. `update()` re-checks the same invariant if an edit would clear
   `end_date` back to active. `delete()` blocks with `ConflictException` if
-  an `Income` row references it via `lease_id` (inline import, same
-  avoid-circular-import reasoning as Fuel/Maintenance/Car Docs).
+  an `Income` row references it via `lease_id`, checked through the
+  already-injected `income_repository` constructor arg (same one
+  `generate_due_income()` uses to create rows) rather than a one-off query.
   `GET /leases` filters by `car_id`, `vendor_id`, `active`. Two extra
   endpoints exist because rent isn't auto-generated (no scheduler/cron in
   this app): `GET /{id}/due-payments` walks months from `start_date` to
@@ -357,7 +383,9 @@ cross-cutting infrastructure lives outside `app/features/`.
   router(s); mounted under `/api/v1` in `app/main.py` (the version prefix
   is deliberate — keep it, don't flatten to bare `/api`). **When adding a
   new feature, create `app/features/<feature>/` following the
-  repository/service/router layout above and register its router here.**
+  repository/service/router layout above, register its router here, and
+  add its `get_<feature>_repository`/`get_<feature>_service` providers to
+  `app/core/dependencies.py`.**
 - Auth: `/api/v1/auth/{register,login,me}` (public except `/me`); login
   uses the standard OAuth2 password flow (`OAuth2PasswordRequestForm`:
   `username` = email) so Swagger's "Authorize" button works out of the box.

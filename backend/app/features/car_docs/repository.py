@@ -22,6 +22,8 @@ class CarDocRepository:
         car_id: uuid.UUID | None = None,
         doc_type: str | None = None,
         expiring_before: date | None = None,
+        date_from: date | None = None,
+        date_to: date | None = None,
     ) -> list[CarDoc]:
         query = select(CarDoc).order_by(CarDoc.created_at)
         if car_id is not None:
@@ -30,6 +32,10 @@ class CarDocRepository:
             query = query.where(CarDoc.doc_type == doc_type)
         if expiring_before is not None:
             query = query.where(CarDoc.expiry_date < expiring_before)
+        if date_from is not None:
+            query = query.where(CarDoc.expiry_date >= date_from)
+        if date_to is not None:
+            query = query.where(CarDoc.expiry_date <= date_to)
         result = await self.db.scalars(query)
         return list(result.all())
 

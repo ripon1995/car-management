@@ -47,9 +47,15 @@ class CarDocService:
         car_id: uuid.UUID | None = None,
         doc_type: str | None = None,
         expiring_before: date | None = None,
+        date_from: date | None = None,
+        date_to: date | None = None,
     ) -> list[CarDoc]:
         return await self.repository.list_all(
-            car_id=car_id, doc_type=doc_type, expiring_before=expiring_before
+            car_id=car_id,
+            doc_type=doc_type,
+            expiring_before=expiring_before,
+            date_from=date_from,
+            date_to=date_to,
         )
 
     async def get_by_id(self, car_doc_id: uuid.UUID) -> CarDoc:

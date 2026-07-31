@@ -9,6 +9,19 @@
   .app-body {
     flex-direction: column;
   }
+
+  .page-actions {
+    width: 100%;
+  }
+
+  .list-filters {
+    width: 100%;
+  }
+
+  .list-filters select,
+  .list-filters input {
+    flex: 1 1 auto;
+  }
 }
 
 .app-main {
@@ -33,7 +46,27 @@
 
 .page-actions {
   display: flex;
+  align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Shared registration-number/month filter bar for list pages (Maintenance, Fuel,
+   Car Docs, Payments, Income) — same shape as DashboardPage.css's .revenue-filters. */
+.list-filters {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.list-filters select,
+.list-filters input {
+  font: inherit;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-h);
 }
 
 .btn-primary {

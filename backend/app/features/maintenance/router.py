@@ -1,4 +1,5 @@
 import uuid
+from datetime import date
 
 from fastapi import APIRouter, Depends, status
 
@@ -14,9 +15,11 @@ router = APIRouter(dependencies=[Depends(get_current_user)])
 async def list_maintenance(
     car_id: uuid.UUID | None = None,
     type: str | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
     service: MaintenanceService = Depends(get_maintenance_service),
 ) -> list[MaintenanceRecord]:
-    return await service.list_all(car_id=car_id, type=type)
+    return await service.list_all(car_id=car_id, type=type, date_from=date_from, date_to=date_to)
 
 
 @router.post("", response_model=MaintenanceRead, status_code=status.HTTP_201_CREATED)

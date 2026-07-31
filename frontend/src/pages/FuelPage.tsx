@@ -32,9 +32,17 @@ function toApiError(err: unknown): ApiError {
   return err instanceof ApiError ? err : new ApiError(0, 'Something went wrong', 'Something went wrong')
 }
 
+function monthToDateRange(month: string): { dateFrom: string; dateTo: string } {
+  const [year, mon] = month.split('-').map(Number)
+  const lastDay = new Date(year, mon, 0).getDate()
+  return { dateFrom: `${month}-01`, dateTo: `${month}-${String(lastDay).padStart(2, '0')}` }
+}
+
 function FuelPage() {
   const [records, setRecords] = useState<FuelRecord[]>([])
   const [cars, setCars] = useState<Car[]>([])
+  const [filterCarId, setFilterCarId] = useState('')
+  const [filterMonth, setFilterMonth] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<ApiError | null>(null)
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -47,13 +55,20 @@ function FuelPage() {
   const typeSelectRef = useRef<HTMLSelectElement>(null)
 
   useEffect(() => {
+    api
+      .listCars()
+      .catch(() => undefined)
+      .then((data) => data && setCars(data))
+  }, [])
+
+  useEffect(() => {
     let cancelled = false
     setIsLoading(true)
-    Promise.all([api.listFuelRecords(), api.listCars()])
-      .then(([recordsData, carsData]) => {
-        if (cancelled) return
-        setRecords(recordsData)
-        setCars(carsData)
+    const { dateFrom, dateTo } = filterMonth ? monthToDateRange(filterMonth) : { dateFrom: undefined, dateTo: undefined }
+    api
+      .listFuelRecords({ carId: filterCarId || undefined, dateFrom, dateTo })
+      .then((data) => {
+        if (!cancelled) setRecords(data)
       })
       .catch((err) => {
         if (!cancelled) setError(toApiError(err))
@@ -64,7 +79,7 @@ function FuelPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [filterCarId, filterMonth])
 
   function carLabel(carId: string) {
     const car = cars.find((c) => c.id === carId)
@@ -172,10 +187,32 @@ function FuelPage() {
           </span>
           Fuel
         </h1>
-        <button type="button" className="btn-primary" onClick={openCreateForm}>
-          <PlusIcon />
-          Add record
-        </button>
+        <div className="page-actions">
+          <div className="list-filters">
+            <select
+              aria-label="Filter by registration number"
+              value={filterCarId}
+              onChange={(event) => setFilterCarId(event.target.value)}
+            >
+              <option value="">All registrations</option>
+              {cars.map((car) => (
+                <option key={car.id} value={car.id}>
+                  {car.registration_number ?? carDisplayLabel(car)}
+                </option>
+              ))}
+            </select>
+            <input
+              type="month"
+              aria-label="Filter by month"
+              value={filterMonth}
+              onChange={(event) => setFilterMonth(event.target.value)}
+            />
+          </div>
+          <button type="button" className="btn-primary" onClick={openCreateForm}>
+            <PlusIcon />
+            Add record
+          </button>
+        </div>
       </div>
 
       {isFormOpen && (

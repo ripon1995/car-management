@@ -43,9 +43,15 @@ class MaintenanceService:
         return record
 
     async def list_all(
-        self, car_id: uuid.UUID | None = None, type: str | None = None
+        self,
+        car_id: uuid.UUID | None = None,
+        type: str | None = None,
+        date_from: date | None = None,
+        date_to: date | None = None,
     ) -> list[MaintenanceRecord]:
-        return await self.repository.list_all(car_id=car_id, type=type)
+        return await self.repository.list_all(
+            car_id=car_id, type=type, date_from=date_from, date_to=date_to
+        )
 
     async def get_by_id(self, maintenance_id: uuid.UUID) -> MaintenanceRecord:
         record = await self.repository.get_by_id(maintenance_id)

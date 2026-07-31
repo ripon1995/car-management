@@ -39,6 +39,8 @@ function IncomePage() {
   const [viewingRow, setViewingRow] = useState<IncomeRow | null>(null)
   const [pendingDelete, setPendingDelete] = useState<Payment | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [filterCarId, setFilterCarId] = useState('')
+  const [filterMonth, setFilterMonth] = useState('')
 
   async function loadDueStatus(leaseList: Lease[]) {
     const entries = await Promise.all(
@@ -105,6 +107,15 @@ function IncomePage() {
     }
     return result.sort((a, b) => (a.month < b.month ? -1 : a.month > b.month ? 1 : 0))
   }, [leases, dueByLease, payments])
+
+  const filteredRows = useMemo(
+    () =>
+      rows.filter(
+        (row) =>
+          (!filterCarId || row.lease.car_id === filterCarId) && (!filterMonth || row.month === filterMonth),
+      ),
+    [rows, filterCarId, filterMonth],
+  )
 
   async function handleMarkPaidClick(row: IncomeRow) {
     if (row.payment) {
@@ -195,11 +206,33 @@ function IncomePage() {
           </span>
           Income
         </h1>
+        <div className="page-actions">
+          <div className="list-filters">
+            <select
+              aria-label="Filter by registration number"
+              value={filterCarId}
+              onChange={(event) => setFilterCarId(event.target.value)}
+            >
+              <option value="">All registrations</option>
+              {cars.map((car) => (
+                <option key={car.id} value={car.id}>
+                  {car.registration_number ?? carDisplayLabel(car)}
+                </option>
+              ))}
+            </select>
+            <input
+              type="month"
+              aria-label="Filter by month"
+              value={filterMonth}
+              onChange={(event) => setFilterMonth(event.target.value)}
+            />
+          </div>
+        </div>
       </div>
 
       {isLoading ? (
         <Loader />
-      ) : rows.length === 0 ? (
+      ) : filteredRows.length === 0 ? (
         <p>No lease income to show yet.</p>
       ) : (
         <div className="data-table-wrap card">
@@ -217,7 +250,7 @@ function IncomePage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((row, index) => {
+              {filteredRows.map((row, index) => {
                 const isPaid = row.payment?.status === 'paid'
                 return (
                   <tr key={row.key}>

@@ -84,12 +84,20 @@ function toApiError(err: unknown): ApiError {
   return err instanceof ApiError ? err : new ApiError(0, 'Something went wrong', 'Something went wrong')
 }
 
+function monthToDateRange(month: string): { dateFrom: string; dateTo: string } {
+  const [year, mon] = month.split('-').map(Number)
+  const lastDay = new Date(year, mon, 0).getDate()
+  return { dateFrom: `${month}-01`, dateTo: `${month}-${String(lastDay).padStart(2, '0')}` }
+}
+
 function PaymentsPage() {
   const [payments, setPayments] = useState<Payment[]>([])
   const [cars, setCars] = useState<Car[]>([])
   const [maintenanceRecords, setMaintenanceRecords] = useState<MaintenanceRecord[]>([])
   const [carDocs, setCarDocs] = useState<CarDoc[]>([])
   const [fuelRecords, setFuelRecords] = useState<FuelRecord[]>([])
+  const [filterCarId, setFilterCarId] = useState('')
+  const [filterMonth, setFilterMonth] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<ApiError | null>(null)
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -105,21 +113,30 @@ function PaymentsPage() {
 
   useEffect(() => {
     let cancelled = false
-    setIsLoading(true)
-    Promise.all([
-      api.listPayments(),
-      api.listCars(),
-      api.listMaintenance(),
-      api.listCarDocs(),
-      api.listFuelRecords(),
-    ])
-      .then(([paymentsData, carsData, maintenanceData, carDocsData, fuelData]) => {
+    Promise.all([api.listCars(), api.listMaintenance(), api.listCarDocs(), api.listFuelRecords()])
+      .then(([carsData, maintenanceData, carDocsData, fuelData]) => {
         if (cancelled) return
-        setPayments(paymentsData.filter((payment) => payment.type !== 'monthly_fair'))
         setCars(carsData)
         setMaintenanceRecords(maintenanceData)
         setCarDocs(carDocsData)
         setFuelRecords(fuelData)
+      })
+      .catch((err) => {
+        if (!cancelled) setError(toApiError(err))
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    setIsLoading(true)
+    const { dateFrom, dateTo } = filterMonth ? monthToDateRange(filterMonth) : { dateFrom: undefined, dateTo: undefined }
+    api
+      .listPayments({ carId: filterCarId || undefined, dateFrom, dateTo })
+      .then((data) => {
+        if (!cancelled) setPayments(data.filter((payment) => payment.type !== 'monthly_fair'))
       })
       .catch((err) => {
         if (!cancelled) setError(toApiError(err))
@@ -130,7 +147,7 @@ function PaymentsPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [filterCarId, filterMonth])
 
   function carLabel(carId: string) {
     const car = cars.find((c) => c.id === carId)
@@ -311,10 +328,32 @@ function PaymentsPage() {
           </span>
           Payments
         </h1>
-        <button type="button" className="btn-primary" onClick={openCreateForm}>
-          <PlusIcon />
-          Add payment
-        </button>
+        <div className="page-actions">
+          <div className="list-filters">
+            <select
+              aria-label="Filter by registration number"
+              value={filterCarId}
+              onChange={(event) => setFilterCarId(event.target.value)}
+            >
+              <option value="">All registrations</option>
+              {cars.map((car) => (
+                <option key={car.id} value={car.id}>
+                  {car.registration_number ?? carDisplayLabel(car)}
+                </option>
+              ))}
+            </select>
+            <input
+              type="month"
+              aria-label="Filter by month"
+              value={filterMonth}
+              onChange={(event) => setFilterMonth(event.target.value)}
+            />
+          </div>
+          <button type="button" className="btn-primary" onClick={openCreateForm}>
+            <PlusIcon />
+            Add payment
+          </button>
+        </div>
       </div>
 
       {isFormOpen && (

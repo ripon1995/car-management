@@ -1,4 +1,5 @@
 import uuid
+from datetime import date, timedelta
 from typing import Any
 
 from sqlalchemy import select
@@ -20,12 +21,20 @@ class MaintenanceRepository:
         self,
         car_id: uuid.UUID | None = None,
         type: str | None = None,
+        date_from: date | None = None,
+        date_to: date | None = None,
     ) -> list[MaintenanceRecord]:
         query = select(MaintenanceRecord).order_by(MaintenanceRecord.created_at)
         if car_id is not None:
             query = query.where(MaintenanceRecord.car_id == car_id)
         if type is not None:
             query = query.where(MaintenanceRecord.type == type)
+        if date_from is not None:
+            query = query.where(MaintenanceRecord.created_at >= date_from)
+        if date_to is not None:
+            # created_at is a timestamp, not a date — use an exclusive upper bound
+            # of the following day so the whole of date_to is included.
+            query = query.where(MaintenanceRecord.created_at < date_to + timedelta(days=1))
         result = await self.db.scalars(query)
         return list(result.all())
 

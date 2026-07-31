@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { PAID_BY_METHODS, type Payment, type PaymentStatus } from '../types/payment'
+import Loader from './Loader'
 
 export interface MarkPaidUpdates {
   status: PaymentStatus
@@ -153,6 +154,11 @@ function MarkPaidDialog({
             {isSaving ? 'Saving…' : 'Save'}
           </button>
         </div>
+        {isSaving && (
+          <div className="modal-panel-overlay">
+            <Loader label="Saving…" />
+          </div>
+        )}
       </form>
     </div>
   )

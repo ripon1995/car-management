@@ -192,6 +192,7 @@
 }
 
 .modal-panel {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -200,6 +201,20 @@
   padding: 32px;
   box-sizing: border-box;
   text-align: left;
+}
+
+/* Shared loading overlay for any modal-panel form mid-submit (create/edit/
+   mark-paid) — same treatment as ConfirmDialog's delete overlay, so every
+   CRUD action in the app shows the same popup loader. */
+.modal-panel-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  opacity: 0.92;
+  border-radius: inherit;
 }
 
 .modal-panel h2 {

@@ -265,6 +265,11 @@ function MaintenancePage() {
                 {isSubmitting ? 'Saving…' : 'Save'}
               </button>
             </div>
+            {isSubmitting && (
+              <div className="modal-panel-overlay">
+                <Loader label="Saving…" />
+              </div>
+            )}
           </form>
         </div>
       )}

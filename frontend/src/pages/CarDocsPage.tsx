@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { CarDocsIcon, PlusIcon, ViewIcon, EditIcon, DeleteIcon } from '../components/NavIcons'
 import ErrorDialog from '../components/ErrorDialog'
+import ConfirmDialog from '../components/ConfirmDialog'
 import { ApiError } from '../errors/api'
 import * as api from '../api'
 import { DOC_TYPES, type CarDoc, type CarDocInput } from '../types/carDoc'
@@ -37,6 +38,8 @@ function CarDocsPage() {
   const [form, setForm] = useState<CarDocInput>(emptyForm)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [viewingDoc, setViewingDoc] = useState<CarDoc | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<CarDoc | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const docTypeSelectRef = useRef<HTMLSelectElement>(null)
 
   useEffect(() => {
@@ -133,13 +136,17 @@ function CarDocsPage() {
     }
   }
 
-  async function handleDelete(doc: CarDoc) {
-    if (!window.confirm(`Delete this ${docLabel(doc)} doc?`)) return
+  async function confirmDelete() {
+    if (!pendingDelete) return
+    setIsDeleting(true)
     try {
-      await api.deleteCarDoc(doc.id)
-      setDocs((prev) => prev.filter((existing) => existing.id !== doc.id))
+      await api.deleteCarDoc(pendingDelete.id)
+      setDocs((prev) => prev.filter((existing) => existing.id !== pendingDelete.id))
     } catch (err) {
       setError(toApiError(err))
+    } finally {
+      setIsDeleting(false)
+      setPendingDelete(null)
     }
   }
 
@@ -343,7 +350,7 @@ function CarDocsPage() {
                       className="icon-btn danger"
                       aria-label={`Delete ${docLabel(doc)}`}
                       title="Delete"
-                      onClick={() => handleDelete(doc)}
+                      onClick={() => setPendingDelete(doc)}
                     >
                       <DeleteIcon />
                     </button>
@@ -354,6 +361,14 @@ function CarDocsPage() {
           </table>
         </div>
       )}
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={`Delete this ${pendingDelete ? docLabel(pendingDelete) : ''} doc?`}
+        isConfirming={isDeleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
 
       <ErrorDialog error={error} onClose={() => setError(null)} />
     </main>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { FuelIcon, PlusIcon, ViewIcon, EditIcon, DeleteIcon } from '../components/NavIcons'
 import ErrorDialog from '../components/ErrorDialog'
+import ConfirmDialog from '../components/ConfirmDialog'
 import { ApiError } from '../errors/api'
 import * as api from '../api'
 import { FUEL_TYPES, type FuelRecord, type FuelInput } from '../types/fuel'
@@ -40,6 +41,8 @@ function FuelPage() {
   const [form, setForm] = useState<FuelInput>(emptyForm)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [viewingRecord, setViewingRecord] = useState<FuelRecord | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<FuelRecord | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const typeSelectRef = useRef<HTMLSelectElement>(null)
 
   useEffect(() => {
@@ -145,13 +148,17 @@ function FuelPage() {
     }
   }
 
-  async function handleDelete(record: FuelRecord) {
-    if (!window.confirm(`Delete this ${recordLabel(record)} fuel record?`)) return
+  async function confirmDelete() {
+    if (!pendingDelete) return
+    setIsDeleting(true)
     try {
-      await api.deleteFuelRecord(record.id)
-      setRecords((prev) => prev.filter((existing) => existing.id !== record.id))
+      await api.deleteFuelRecord(pendingDelete.id)
+      setRecords((prev) => prev.filter((existing) => existing.id !== pendingDelete.id))
     } catch (err) {
       setError(toApiError(err))
+    } finally {
+      setIsDeleting(false)
+      setPendingDelete(null)
     }
   }
 
@@ -414,7 +421,7 @@ function FuelPage() {
                       className="icon-btn danger"
                       aria-label={`Delete ${recordLabel(record)}`}
                       title="Delete"
-                      onClick={() => handleDelete(record)}
+                      onClick={() => setPendingDelete(record)}
                     >
                       <DeleteIcon />
                     </button>
@@ -425,6 +432,14 @@ function FuelPage() {
           </table>
         </div>
       )}
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={`Delete this ${pendingDelete ? recordLabel(pendingDelete) : ''} fuel record?`}
+        isConfirming={isDeleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
 
       <ErrorDialog error={error} onClose={() => setError(null)} />
     </main>

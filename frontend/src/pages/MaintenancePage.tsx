@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { MaintenanceIcon, PlusIcon, ViewIcon, EditIcon, DeleteIcon } from '../components/NavIcons'
 import ErrorDialog from '../components/ErrorDialog'
+import ConfirmDialog from '../components/ConfirmDialog'
 import { ApiError } from '../errors/api'
 import * as api from '../api'
 import { MAINTENANCE_TYPES, type MaintenanceRecord, type MaintenanceInput } from '../types/maintenance'
@@ -38,6 +39,8 @@ function MaintenancePage() {
   const [form, setForm] = useState<MaintenanceInput>(emptyForm)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [viewingRecord, setViewingRecord] = useState<MaintenanceRecord | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<MaintenanceRecord | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const typeSelectRef = useRef<HTMLSelectElement>(null)
 
   useEffect(() => {
@@ -140,13 +143,17 @@ function MaintenancePage() {
     }
   }
 
-  async function handleDelete(record: MaintenanceRecord) {
-    if (!window.confirm(`Delete this ${recordLabel(record)} maintenance record?`)) return
+  async function confirmDelete() {
+    if (!pendingDelete) return
+    setIsDeleting(true)
     try {
-      await api.deleteMaintenance(record.id)
-      setRecords((prev) => prev.filter((existing) => existing.id !== record.id))
+      await api.deleteMaintenance(pendingDelete.id)
+      setRecords((prev) => prev.filter((existing) => existing.id !== pendingDelete.id))
     } catch (err) {
       setError(toApiError(err))
+    } finally {
+      setIsDeleting(false)
+      setPendingDelete(null)
     }
   }
 
@@ -368,7 +375,7 @@ function MaintenancePage() {
                       className="icon-btn danger"
                       aria-label={`Delete ${recordLabel(record)}`}
                       title="Delete"
-                      onClick={() => handleDelete(record)}
+                      onClick={() => setPendingDelete(record)}
                     >
                       <DeleteIcon />
                     </button>
@@ -379,6 +386,14 @@ function MaintenancePage() {
           </table>
         </div>
       )}
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={`Delete this ${pendingDelete ? recordLabel(pendingDelete) : ''} maintenance record?`}
+        isConfirming={isDeleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
 
       <ErrorDialog error={error} onClose={() => setError(null)} />
     </main>

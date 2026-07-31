@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { PaymentsIcon, PlusIcon, ViewIcon, EditIcon, DeleteIcon } from '../components/NavIcons'
 import ErrorDialog from '../components/ErrorDialog'
+import ConfirmDialog from '../components/ConfirmDialog'
 import { ApiError } from '../errors/api'
 import * as api from '../api'
 import { PAYMENT_TYPES, type Payment, type PaymentInput } from '../types/payment'
@@ -90,6 +91,8 @@ function PaymentsPage() {
   const [form, setForm] = useState<PaymentInput>(emptyForm)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [viewingPayment, setViewingPayment] = useState<Payment | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<Payment | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const paidByInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -251,13 +254,17 @@ function PaymentsPage() {
     }
   }
 
-  async function handleDelete(payment: Payment) {
-    if (!window.confirm(`Delete this ${typeLabels[payment.type]} payment?`)) return
+  async function confirmDelete() {
+    if (!pendingDelete) return
+    setIsDeleting(true)
     try {
-      await api.deletePayment(payment.id)
-      setPayments((prev) => prev.filter((existing) => existing.id !== payment.id))
+      await api.deletePayment(pendingDelete.id)
+      setPayments((prev) => prev.filter((existing) => existing.id !== pendingDelete.id))
     } catch (err) {
       setError(toApiError(err))
+    } finally {
+      setIsDeleting(false)
+      setPendingDelete(null)
     }
   }
 
@@ -610,7 +617,7 @@ function PaymentsPage() {
                       className="icon-btn danger"
                       aria-label={`Delete payment`}
                       title="Delete"
-                      onClick={() => handleDelete(payment)}
+                      onClick={() => setPendingDelete(payment)}
                     >
                       <DeleteIcon />
                     </button>
@@ -621,6 +628,14 @@ function PaymentsPage() {
           </table>
         </div>
       )}
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={`Delete this ${pendingDelete ? typeLabels[pendingDelete.type] : ''} payment?`}
+        isConfirming={isDeleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
 
       <ErrorDialog error={error} onClose={() => setError(null)} />
     </main>

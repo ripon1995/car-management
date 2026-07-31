@@ -113,9 +113,7 @@
 
 .data-table tbody tr:hover {
   background-color: var(--accent-bg);
-  box-shadow:
-    rgba(16, 24, 40, 0.14) 0 16px 24px -6px,
-    rgba(16, 24, 40, 0.08) 0 6px 10px -3px;
+  box-shadow: var(--shadow-card-hover);
   transform: translateY(-3px);
   position: relative;
   z-index: 1;
@@ -157,7 +155,7 @@
 }
 
 .icon-btn.danger:hover {
-  background: rgba(208, 59, 59, 0.1);
+  background: var(--danger-bg);
   color: var(--status-critical);
   border-color: var(--status-critical);
 }
@@ -169,7 +167,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(16, 24, 40, 0.45);
+  background: var(--backdrop);
   padding: 16px;
   z-index: 100;
 }

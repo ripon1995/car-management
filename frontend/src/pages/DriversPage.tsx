@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { DriversIcon, PlusIcon, ViewIcon, EditIcon, DeleteIcon } from '../components/NavIcons'
 import ErrorDialog from '../components/ErrorDialog'
+import ConfirmDialog from '../components/ConfirmDialog'
 import { ApiError } from '../errors/api'
 import * as api from '../api'
 import type { Driver, DriverInput } from '../types/driver'
@@ -26,6 +27,8 @@ function DriversPage() {
   const [form, setForm] = useState<DriverInput>(emptyForm)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [viewingDriver, setViewingDriver] = useState<Driver | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<Driver | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const nameInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -115,13 +118,17 @@ function DriversPage() {
     }
   }
 
-  async function handleDelete(driver: Driver) {
-    if (!window.confirm(`Delete driver "${driver.name}"?`)) return
+  async function confirmDelete() {
+    if (!pendingDelete) return
+    setIsDeleting(true)
     try {
-      await api.deleteDriver(driver.id)
-      setDrivers((prev) => prev.filter((existing) => existing.id !== driver.id))
+      await api.deleteDriver(pendingDelete.id)
+      setDrivers((prev) => prev.filter((existing) => existing.id !== pendingDelete.id))
     } catch (err) {
       setError(toApiError(err))
+    } finally {
+      setIsDeleting(false)
+      setPendingDelete(null)
     }
   }
 
@@ -293,7 +300,7 @@ function DriversPage() {
                       className="icon-btn danger"
                       aria-label={`Delete ${driver.name}`}
                       title="Delete"
-                      onClick={() => handleDelete(driver)}
+                      onClick={() => setPendingDelete(driver)}
                     >
                       <DeleteIcon />
                     </button>
@@ -304,6 +311,14 @@ function DriversPage() {
           </table>
         </div>
       )}
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={`Delete driver "${pendingDelete?.name}"?`}
+        isConfirming={isDeleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
 
       <ErrorDialog error={error} onClose={() => setError(null)} />
     </main>

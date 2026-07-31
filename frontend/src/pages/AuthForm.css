@@ -52,7 +52,7 @@
 }
 
 .auth-form .error {
-  color: #e5484d;
+  color: var(--danger);
   font-size: 14px;
   margin: 0;
 }

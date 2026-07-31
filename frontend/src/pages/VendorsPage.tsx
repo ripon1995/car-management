@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { VendorsIcon, PlusIcon, ViewIcon, EditIcon, DeleteIcon } from '../components/NavIcons'
 import ErrorDialog from '../components/ErrorDialog'
+import ConfirmDialog from '../components/ConfirmDialog'
 import { ApiError } from '../errors/api'
 import * as api from '../api'
 import type { Vendor, VendorInput } from '../types/vendor'
@@ -26,6 +27,8 @@ function VendorsPage() {
   const [form, setForm] = useState<VendorInput>(emptyForm)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [viewingVendor, setViewingVendor] = useState<Vendor | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<Vendor | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const nameInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -115,13 +118,17 @@ function VendorsPage() {
     }
   }
 
-  async function handleDelete(vendor: Vendor) {
-    if (!window.confirm(`Delete vendor "${vendor.name}"?`)) return
+  async function confirmDelete() {
+    if (!pendingDelete) return
+    setIsDeleting(true)
     try {
-      await api.deleteVendor(vendor.id)
-      setVendors((prev) => prev.filter((existing) => existing.id !== vendor.id))
+      await api.deleteVendor(pendingDelete.id)
+      setVendors((prev) => prev.filter((existing) => existing.id !== pendingDelete.id))
     } catch (err) {
       setError(toApiError(err))
+    } finally {
+      setIsDeleting(false)
+      setPendingDelete(null)
     }
   }
 
@@ -293,7 +300,7 @@ function VendorsPage() {
                       className="icon-btn danger"
                       aria-label={`Delete ${vendor.name}`}
                       title="Delete"
-                      onClick={() => handleDelete(vendor)}
+                      onClick={() => setPendingDelete(vendor)}
                     >
                       <DeleteIcon />
                     </button>
@@ -304,6 +311,14 @@ function VendorsPage() {
           </table>
         </div>
       )}
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={`Delete vendor "${pendingDelete?.name}"?`}
+        isConfirming={isDeleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
 
       <ErrorDialog error={error} onClose={() => setError(null)} />
     </main>

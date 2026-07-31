@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { CarsIcon, PlusIcon, ViewIcon, EditIcon, DeleteIcon } from '../components/NavIcons'
 import ErrorDialog from '../components/ErrorDialog'
+import ConfirmDialog from '../components/ConfirmDialog'
 import { ApiError } from '../errors/api'
 import * as api from '../api'
 import type { Car, CarInput } from '../types/car'
@@ -41,6 +42,8 @@ function CarsPage() {
   const [form, setForm] = useState<CarInput>(emptyForm)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [viewingCar, setViewingCar] = useState<Car | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<Car | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const brandInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -162,13 +165,17 @@ function CarsPage() {
     }
   }
 
-  async function handleDelete(car: Car) {
-    if (!window.confirm(`Delete car "${`${car.brand} ${car.model_name ?? ''}`.trim()}"?`)) return
+  async function confirmDelete() {
+    if (!pendingDelete) return
+    setIsDeleting(true)
     try {
-      await api.deleteCar(car.id)
-      setCars((prev) => prev.filter((existing) => existing.id !== car.id))
+      await api.deleteCar(pendingDelete.id)
+      setCars((prev) => prev.filter((existing) => existing.id !== pendingDelete.id))
     } catch (err) {
       setError(toApiError(err))
+    } finally {
+      setIsDeleting(false)
+      setPendingDelete(null)
     }
   }
 
@@ -436,7 +443,7 @@ function CarsPage() {
                       className="icon-btn danger"
                       aria-label={`Delete ${car.brand}`}
                       title="Delete"
-                      onClick={() => handleDelete(car)}
+                      onClick={() => setPendingDelete(car)}
                     >
                       <DeleteIcon />
                     </button>
@@ -447,6 +454,14 @@ function CarsPage() {
           </table>
         </div>
       )}
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={`Delete car "${pendingDelete ? `${pendingDelete.brand} ${pendingDelete.model_name ?? ''}`.trim() : ''}"?`}
+        isConfirming={isDeleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
 
       <ErrorDialog error={error} onClose={() => setError(null)} />
     </main>

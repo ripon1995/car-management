@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { LeaseIcon, PlusIcon, ViewIcon, EditIcon, DeleteIcon } from '../components/NavIcons'
 import ErrorDialog from '../components/ErrorDialog'
+import ConfirmDialog from '../components/ConfirmDialog'
 import { ApiError } from '../errors/api'
 import * as api from '../api'
 import type { Lease, LeaseInput, DuePayments } from '../types/lease'
@@ -31,6 +32,8 @@ function LeasesPage() {
   const [form, setForm] = useState<LeaseInput>(emptyForm)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [viewingLease, setViewingLease] = useState<Lease | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<Lease | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [dueStatus, setDueStatus] = useState<DuePayments | null>(null)
   const [isDueLoading, setIsDueLoading] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
@@ -161,13 +164,17 @@ function LeasesPage() {
     }
   }
 
-  async function handleDelete(lease: Lease) {
-    if (!window.confirm(`Delete lease "${recordLabel(lease)}"?`)) return
+  async function confirmDelete() {
+    if (!pendingDelete) return
+    setIsDeleting(true)
     try {
-      await api.deleteLease(lease.id)
-      setLeases((prev) => prev.filter((existing) => existing.id !== lease.id))
+      await api.deleteLease(pendingDelete.id)
+      setLeases((prev) => prev.filter((existing) => existing.id !== pendingDelete.id))
     } catch (err) {
       setError(toApiError(err))
+    } finally {
+      setIsDeleting(false)
+      setPendingDelete(null)
     }
   }
 
@@ -450,7 +457,7 @@ function LeasesPage() {
                       className="icon-btn danger"
                       aria-label={`Delete ${recordLabel(lease)}`}
                       title="Delete"
-                      onClick={() => handleDelete(lease)}
+                      onClick={() => setPendingDelete(lease)}
                     >
                       <DeleteIcon />
                     </button>
@@ -461,6 +468,14 @@ function LeasesPage() {
           </table>
         </div>
       )}
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={`Delete lease "${pendingDelete ? recordLabel(pendingDelete) : ''}"?`}
+        isConfirming={isDeleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
 
       <ErrorDialog error={error} onClose={() => setError(null)} />
     </main>

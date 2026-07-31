@@ -347,6 +347,35 @@ create button, since there's nothing to create.
   `setError` — copy this helper into each new page rather than importing
   it, matching the existing `LoginPage`/`RegisterPage`/`CarOwnersPage`
   duplication.
+- **Dark theme:** `src/index.css` defines every color as a `--token` on
+  `:root`, with a `:root[data-theme='dark']` block overriding the same
+  token names (don't hardcode a color anywhere in a `.css` file — add a
+  token pair instead, one per theme). `src/store/themeStore.ts` (zustand)
+  holds the current `Theme` (`'light' | 'dark'`), persists it to
+  `localStorage` (`THEME_STORAGE_KEY` in `src/constants/config.ts`), and
+  sets `document.documentElement.dataset.theme` on change/load.
+  `src/components/ThemeToggle.tsx` (Sun/Moon icon button from
+  `NavIcons.tsx`) is mounted inside `Header.tsx`'s `.app-header-account`,
+  always visible regardless of login state. `index.html` has an inline
+  `<script>` before `main.tsx` loads that reads the same storage key and
+  sets `data-theme` immediately, to avoid a light-mode flash on load —
+  keep that script in sync with `themeStore.ts`'s `resolveInitialTheme()`
+  logic if the storage key or fallback ever changes. `Header.css`'s navy
+  bar (`#0f172a`) is deliberately **not** theme-reactive — it's a fixed
+  brand bar in both themes, not part of the `--surface`/`--bg` system.
+- **Confirm dialog:** every destructive delete across all 9 CRUD pages
+  uses `src/components/ConfirmDialog.tsx` (a `role="alertdialog"` modal
+  with a danger icon, Cancel/Delete actions, and a `Loader` overlay while
+  `isConfirming`) instead of `window.confirm`. The per-page pattern: a
+  `pendingDelete` state (the record awaiting confirmation, or `null`) that
+  a row's delete `.icon-btn` sets directly, an `isDeleting` boolean, and a
+  `confirmDelete()` async function (replacing the old `handleDelete`) that
+  calls the delete API, updates the list state, and always clears both
+  `pendingDelete`/`isDeleting` in a `finally` block — even on error, so
+  the dialog closes and `ErrorDialog` takes over showing the failure. Copy
+  this shape (see `CarOwnersPage.tsx`) for any new page's delete flow;
+  don't reintroduce `window.confirm`. `src/components/Loader.tsx` is a
+  small dependency-free CSS spinner used only for this overlay.
 - Shared page-chrome classes live in `App.css` (global, not per-page) since
   every feature page reuses them — add new cross-page primitives there,
   not in a page's own CSS file:

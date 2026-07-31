@@ -88,6 +88,28 @@ wrapped in a `<label className="form-field">` with a visible
 format example on top of the label, not a replacement for it. See
 `CLAUDE.md`'s Frontend architecture section for the current convention.
 
+## Dark theme + dialog redesign: ported from `number-nest`
+
+The user pointed at a sibling project, `number-nest` (a different app in
+the same monorepo family), where dark theme support and a redesigned
+error/confirm dialog pair had already shipped, and asked for the same
+treatment here. Rather than invent a new design, the tokens, components,
+and interaction patterns were ported near-verbatim from `number-nest`'s
+`src/index.css`, `src/store/themeStore.ts`, `src/components/ThemeToggle.tsx`,
+`ErrorDialog.tsx`/`.css`, and `ConfirmDialog.tsx`/`.css`, then adapted to
+this app's existing token names and orange accent (`number-nest` uses
+blue) instead of introducing a second design language. One deliberate
+departure: `number-nest`'s `Loader` wraps the `react-loader-spinner`
+package; that dependency wasn't already in this project's `package.json`
+and pulling it in for one small overlay wasn't worth it, so
+`src/components/Loader.tsx` here is a small hand-rolled CSS spinner
+instead — same role, no new dependency. See `CLAUDE.md`'s Frontend
+architecture section (Dark theme / Confirm dialog bullets) for the
+resulting conventions. This also replaced every page's `window.confirm`
+delete confirmation with the new `ConfirmDialog` — that swap wasn't
+present in any feature doc, it fell out naturally from redesigning the
+dialog pair.
+
 ## Dashboard: why no chart library
 
 `DashboardPage.tsx` (the Revenue dashboard) was the app's first

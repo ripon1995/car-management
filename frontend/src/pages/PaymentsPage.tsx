@@ -11,6 +11,7 @@ import type { CarDoc } from '../types/carDoc'
 import type { FuelRecord } from '../types/fuel'
 import type { Lease } from '../types/lease'
 import type { Vendor } from '../types/vendor'
+import Loader from '../components/Loader'
 import './PaymentsPage.css'
 
 const todayIso = new Date().toISOString().slice(0, 10)
@@ -565,7 +566,7 @@ function PaymentsPage() {
       )}
 
       {isLoading ? (
-        <p>Loading…</p>
+        <Loader />
       ) : payments.length === 0 ? (
         <p>No payments yet.</p>
       ) : (

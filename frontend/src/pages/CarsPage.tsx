@@ -9,6 +9,7 @@ import type { CarOwner } from '../types/carOwner'
 import type { Vendor } from '../types/vendor'
 import type { Driver } from '../types/driver'
 import type { Lease } from '../types/lease'
+import Loader from '../components/Loader'
 import './CarsPage.css'
 
 const currentYear = new Date().getFullYear()
@@ -389,7 +390,7 @@ function CarsPage() {
       )}
 
       {isLoading ? (
-        <p>Loading…</p>
+        <Loader />
       ) : cars.length === 0 ? (
         <p>No cars yet.</p>
       ) : (

@@ -6,6 +6,7 @@ import { ApiError } from '../errors/api'
 import * as api from '../api'
 import { DOC_TYPES, type CarDoc, type CarDocInput } from '../types/carDoc'
 import { carDisplayLabel, type Car } from '../types/car'
+import Loader from '../components/Loader'
 import './CarDocsPage.css'
 
 const todayIso = new Date().toISOString().slice(0, 10)
@@ -300,7 +301,7 @@ function CarDocsPage() {
       )}
 
       {isLoading ? (
-        <p>Loading…</p>
+        <Loader />
       ) : docs.length === 0 ? (
         <p>No car docs yet.</p>
       ) : (

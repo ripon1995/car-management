@@ -5,6 +5,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import { ApiError } from '../errors/api'
 import * as api from '../api'
 import type { CarOwner, CarOwnerInput } from '../types/carOwner'
+import Loader from '../components/Loader'
 import './CarOwnersPage.css'
 
 const emptyForm: CarOwnerInput = { name: '', phone_number: '' }
@@ -216,7 +217,7 @@ function CarOwnersPage() {
       )}
 
       {isLoading ? (
-        <p>Loading…</p>
+        <Loader />
       ) : owners.length === 0 ? (
         <p>No car owners yet.</p>
       ) : (

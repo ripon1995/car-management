@@ -6,6 +6,7 @@ import { ApiError } from '../errors/api'
 import * as api from '../api'
 import { FUEL_TYPES, type FuelRecord, type FuelInput } from '../types/fuel'
 import { carDisplayLabel, type Car } from '../types/car'
+import Loader from '../components/Loader'
 import './FuelPage.css'
 
 const typeLabels: Record<string, string> = {
@@ -369,7 +370,7 @@ function FuelPage() {
       )}
 
       {isLoading ? (
-        <p>Loading…</p>
+        <Loader />
       ) : records.length === 0 ? (
         <p>No fuel records yet.</p>
       ) : (

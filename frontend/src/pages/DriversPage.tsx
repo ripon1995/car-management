@@ -5,6 +5,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import { ApiError } from '../errors/api'
 import * as api from '../api'
 import type { Driver, DriverInput } from '../types/driver'
+import Loader from '../components/Loader'
 import './DriversPage.css'
 
 const emptyForm: DriverInput = {
@@ -254,7 +255,7 @@ function DriversPage() {
       )}
 
       {isLoading ? (
-        <p>Loading…</p>
+        <Loader />
       ) : drivers.length === 0 ? (
         <p>No drivers yet.</p>
       ) : (

@@ -5,6 +5,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import { ApiError } from '../errors/api'
 import * as api from '../api'
 import type { Vendor, VendorInput } from '../types/vendor'
+import Loader from '../components/Loader'
 import './VendorsPage.css'
 
 const emptyForm: VendorInput = {
@@ -254,7 +255,7 @@ function VendorsPage() {
       )}
 
       {isLoading ? (
-        <p>Loading…</p>
+        <Loader />
       ) : vendors.length === 0 ? (
         <p>No vendors yet.</p>
       ) : (

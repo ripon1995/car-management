@@ -7,6 +7,7 @@ import * as api from '../api'
 import type { Lease, LeaseInput, DuePayments } from '../types/lease'
 import { carDisplayLabel, type Car } from '../types/car'
 import type { Vendor } from '../types/vendor'
+import Loader from '../components/Loader'
 import './LeasesPage.css'
 
 const emptyForm: LeaseInput = {
@@ -403,7 +404,7 @@ function LeasesPage() {
       )}
 
       {isLoading ? (
-        <p>Loading…</p>
+        <Loader />
       ) : leases.length === 0 ? (
         <p>No leases yet.</p>
       ) : (

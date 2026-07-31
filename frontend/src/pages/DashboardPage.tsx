@@ -6,6 +6,7 @@ import * as api from '../api'
 import type { Car } from '../types/car'
 import type { Payment } from '../types/payment'
 import type { RevenueSummary } from '../types/revenue'
+import Loader from '../components/Loader'
 import './DashboardPage.css'
 
 const TYPE_ORDER = ['monthly_fair', 'service', 'document', 'other'] as const
@@ -304,7 +305,7 @@ function DashboardPage() {
       </div>
 
       {isLoading || !summary ? (
-        <p>Loading…</p>
+        <Loader />
       ) : (
         <>
           <div className="stat-tiles">

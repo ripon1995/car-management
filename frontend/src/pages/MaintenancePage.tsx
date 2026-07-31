@@ -6,6 +6,7 @@ import { ApiError } from '../errors/api'
 import * as api from '../api'
 import { MAINTENANCE_TYPES, type MaintenanceRecord, type MaintenanceInput } from '../types/maintenance'
 import { carDisplayLabel, type Car } from '../types/car'
+import Loader from '../components/Loader'
 import './MaintenancePage.css'
 
 const typeLabels: Record<string, string> = {
@@ -325,7 +326,7 @@ function MaintenancePage() {
       )}
 
       {isLoading ? (
-        <p>Loading…</p>
+        <Loader />
       ) : records.length === 0 ? (
         <p>No maintenance records yet.</p>
       ) : (

@@ -170,6 +170,22 @@ function PaymentsPage() {
     return record ? fuelRecordLabel(record) : '—'
   }
 
+  function paymentTypeLabel(payment: Payment): string {
+    if (payment.type === 'service' && payment.associated_maintenance) {
+      const record = maintenanceRecords.find((r) => r.id === payment.associated_maintenance)
+      if (record) return maintenanceTypeLabels[record.type]
+    }
+    if (payment.type === 'document' && payment.associated_cardocs) {
+      const doc = carDocs.find((d) => d.id === payment.associated_cardocs)
+      if (doc) return docTypeLabels[doc.doc_type]
+    }
+    if (payment.type === 'fuel' && payment.associated_fuel) {
+      const record = fuelRecords.find((r) => r.id === payment.associated_fuel)
+      if (record) return fuelTypeLabels[record.fuel_type]
+    }
+    return typeLabels[payment.type]
+  }
+
   function openCreateForm() {
     setEditingId(null)
     setForm(emptyForm)
@@ -540,7 +556,7 @@ function PaymentsPage() {
             <dl className="detail-list">
               <div>
                 <dt>Type</dt>
-                <dd>{typeLabels[viewingPayment.type]}</dd>
+                <dd>{paymentTypeLabel(viewingPayment)}</dd>
               </div>
               <div>
                 <dt>Car</dt>
@@ -637,7 +653,7 @@ function PaymentsPage() {
               {payments.map((payment, index) => (
                 <tr key={payment.id}>
                   <td>{index + 1}</td>
-                  <td>{typeLabels[payment.type]}</td>
+                  <td>{paymentTypeLabel(payment)}</td>
                   <td>{payment.amount}</td>
                   <td>{carLabel(payment.car_id)}</td>
                   <td>{payment.payment_date}</td>

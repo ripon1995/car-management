@@ -374,8 +374,10 @@ create button, since there's nothing to create.
   `pendingDelete`/`isDeleting` in a `finally` block — even on error, so
   the dialog closes and `ErrorDialog` takes over showing the failure. Copy
   this shape (see `CarOwnersPage.tsx`) for any new page's delete flow;
-  don't reintroduce `window.confirm`. `src/components/Loader.tsx` is a
-  small dependency-free CSS spinner used only for this overlay.
+  don't reintroduce `window.confirm`. `src/components/Loader.tsx` wraps
+  `react-loader-spinner`'s `BallTriangle` (`^8.0.2`, matching
+  `number-nest`'s version of the same package) — used only for this
+  overlay, not for page-level "Loading…" states, which stay plain text.
 - Shared page-chrome classes live in `App.css` (global, not per-page) since
   every feature page reuses them — add new cross-page primitives there,
   not in a page's own CSS file:

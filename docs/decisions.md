@@ -98,17 +98,17 @@ and interaction patterns were ported near-verbatim from `number-nest`'s
 `src/index.css`, `src/store/themeStore.ts`, `src/components/ThemeToggle.tsx`,
 `ErrorDialog.tsx`/`.css`, and `ConfirmDialog.tsx`/`.css`, then adapted to
 this app's existing token names and orange accent (`number-nest` uses
-blue) instead of introducing a second design language. One deliberate
-departure: `number-nest`'s `Loader` wraps the `react-loader-spinner`
-package; that dependency wasn't already in this project's `package.json`
-and pulling it in for one small overlay wasn't worth it, so
-`src/components/Loader.tsx` here is a small hand-rolled CSS spinner
-instead — same role, no new dependency. See `CLAUDE.md`'s Frontend
-architecture section (Dark theme / Confirm dialog bullets) for the
-resulting conventions. This also replaced every page's `window.confirm`
-delete confirmation with the new `ConfirmDialog` — that swap wasn't
-present in any feature doc, it fell out naturally from redesigning the
-dialog pair.
+blue) instead of introducing a second design language. `Loader.tsx`
+initially shipped as a hand-rolled CSS spinner to avoid adding a
+dependency, but the user explicitly asked for `react-loader-spinner`'s
+`BallTriangle` (the same package `number-nest` uses, just a different
+component — `number-nest` uses `DNA`) — `Loader.tsx` now wraps
+`BallTriangle` at the same `^8.0.2` version instead. See `CLAUDE.md`'s
+Frontend architecture section (Dark theme / Confirm dialog bullets) for
+the resulting conventions. This also replaced every page's
+`window.confirm` delete confirmation with the new `ConfirmDialog` — that
+swap wasn't present in any feature doc, it fell out naturally from
+redesigning the dialog pair.
 
 ## Dashboard: why no chart library
 

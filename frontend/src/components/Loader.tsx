@@ -1,3 +1,4 @@
+import { BallTriangle } from 'react-loader-spinner'
 import './Loader.css'
 
 interface LoaderProps {
@@ -6,9 +7,8 @@ interface LoaderProps {
 
 function Loader({ label = 'Loading' }: LoaderProps) {
   return (
-    <div className="app-loader" role="status" aria-label={label}>
-      <span className="app-loader-spinner" aria-hidden="true" />
-      <span className="app-loader-label">{label}</span>
+    <div className="app-loader">
+      <BallTriangle height={80} width={80} radius={5} color="#ea580c" ariaLabel={label} visible />
     </div>
   )
 }

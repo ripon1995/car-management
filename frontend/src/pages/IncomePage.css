@@ -3,3 +3,11 @@
   text-align: left;
   width: 100%;
 }
+
+.income-page .mark-received-col {
+  text-align: center;
+}
+
+.income-page td .mark-received-col {
+  justify-content: center;
+}

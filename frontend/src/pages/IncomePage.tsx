@@ -212,7 +212,7 @@ function IncomePage() {
                 <th>Month</th>
                 <th>Amount</th>
                 <th>Status</th>
-                <th>Mark received</th>
+                <th className="mark-received-col">Mark received</th>
                 <th>Action</th>
               </tr>
             </thead>
@@ -232,7 +232,7 @@ function IncomePage() {
                       </span>
                     </td>
                     <td>
-                      <div className="data-table-actions">
+                      <div className="data-table-actions mark-received-col">
                         {!isPaid && (
                           <button
                             type="button"

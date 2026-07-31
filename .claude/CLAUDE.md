@@ -427,7 +427,16 @@ action-bearing column is ever added anywhere, keep `display:flex` off the
   This flow always opens the dialog with `simple` (see the Mark-paid
   dialog bullet) — Amount/Car/Type/Paid by/Paid to are already correct
   (populated by `generate_due_payments()`), so the popup only asks for
-  Status/Payment date/Description, not a full edit form.
+  Status/Payment date/Description, not a full edit form. Unlike `Action`
+  (right-aligned as the table's actual last column via the shared
+  `.data-table th:last-child`/`td:last-child` rule), "Mark received" sits
+  in the middle of the table, so its single icon is centered under its
+  own header rather than right/left-aligned: both the `<th>` and the
+  inner `<div className="data-table-actions">` also get a
+  `mark-received-col` class (styled in `IncomePage.css`, not `App.css`,
+  since it's specific to this one column) that centers the header text
+  and overrides `.data-table-actions`' default `justify-content:
+  flex-end` to `center`.
 - **`Action` column**: View/Edit/Delete, shown only for rows with a real
   `Payment` (a synthetic row has nothing to view/edit/delete yet). View
   opens a read-only `<dl className="detail-list">` modal (`viewingRow:

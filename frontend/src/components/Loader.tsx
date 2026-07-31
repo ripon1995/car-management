@@ -1,4 +1,4 @@
-import { BallTriangle } from 'react-loader-spinner'
+import { HashLoader } from 'react-spinners'
 import './Loader.css'
 
 interface LoaderProps {
@@ -8,7 +8,7 @@ interface LoaderProps {
 function Loader({ label = 'Loading' }: LoaderProps) {
   return (
     <div className="app-loader">
-      <BallTriangle height={80} width={80} radius={5} color="#ea580c" ariaLabel={label} visible />
+      <HashLoader size={80} color="#ea580c" aria-label={label} loading />
     </div>
   )
 }

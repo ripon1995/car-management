@@ -118,6 +118,16 @@ view modal (removed as part of this same change, per the user's explicit
 architecture sections for the resulting conventions — this section is only
 the "why."
 
+**Follow-up, same day:** `paid_by` was further constrained to an enum —
+`PAID_BY_METHODS = ("EBL", "DBBL", "UCB", "CASH")` — for every payment
+type *except* `monthly_fair` (user's explicit call). `monthly_fair` was
+left as free text since `paid_by` there is the vendor's name, populated
+automatically by `generate_due_payments()`, not a payment-method choice a
+person picks. Enforced in `PaymentService._validate_paid_by()` on both
+`create()` and `update()`, and reflected in the frontend by swapping
+`PaymentsPage.tsx`'s and `MarkPaidDialog.tsx`'s `paid_by` `<input>` for a
+`<select>` whenever the payment's type isn't `monthly_fair`.
+
 ## Frontend form-field labeling: why placeholder-only fields were removed
 
 Every form field was originally allowed to rely on `placeholder` text

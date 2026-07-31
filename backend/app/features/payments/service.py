@@ -14,7 +14,13 @@ from app.features.leases.repository import LeaseRepository
 from app.features.maintenance.repository import MaintenanceRepository
 from app.features.payments.models import Payment
 from app.features.payments.repository import PaymentRepository
-from app.features.payments.schemas import PAYMENT_STATUSES, PAYMENT_TYPES, PaymentCreate, PaymentUpdate
+from app.features.payments.schemas import (
+    PAID_BY_METHODS,
+    PAYMENT_STATUSES,
+    PAYMENT_TYPES,
+    PaymentCreate,
+    PaymentUpdate,
+)
 
 
 class PaymentService:
@@ -39,6 +45,7 @@ class PaymentService:
     async def create(self, payload: PaymentCreate) -> Payment:
         self._validate_type(payload.type)
         self._validate_status(payload.status)
+        self._validate_paid_by(payload.type, payload.paid_by)
         self._validate_associations(
             payload.type,
             payload.associated_maintenance,
@@ -87,6 +94,10 @@ class PaymentService:
             self._validate_type(updates["type"])
         if "status" in updates:
             self._validate_status(updates["status"])
+        if "type" in updates or "paid_by" in updates:
+            self._validate_paid_by(
+                updates.get("type", payment.type), updates.get("paid_by", payment.paid_by)
+            )
 
         association_fields = (
             "type",
@@ -148,6 +159,13 @@ class PaymentService:
     def _validate_status(status: str) -> None:
         if status not in PAYMENT_STATUSES:
             raise ValidationException(f"status must be one of {', '.join(PAYMENT_STATUSES)}")
+
+    @staticmethod
+    def _validate_paid_by(type: str, paid_by: str) -> None:
+        if type != "monthly_fair" and paid_by not in PAID_BY_METHODS:
+            raise ValidationException(
+                f"paid_by must be one of {', '.join(PAID_BY_METHODS)} when type is not 'monthly_fair'"
+            )
 
     @staticmethod
     def _validate_associations(

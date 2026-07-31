@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict
 
 PAYMENT_TYPES = ("service", "document", "fuel", "monthly_fair", "other")
 PAYMENT_STATUSES = ("paid", "unpaid")
+PAID_BY_METHODS = ("EBL", "DBBL", "UCB", "CASH")
 
 
 class PaymentCreate(BaseModel):

@@ -1,10 +1,16 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type RefObject } from 'react'
 import { PaymentsIcon, PlusIcon, ViewIcon, EditIcon, DeleteIcon, CheckIcon } from '../components/NavIcons'
 import ErrorDialog from '../components/ErrorDialog'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { ApiError } from '../errors/api'
 import * as api from '../api'
-import { MANUAL_PAYMENT_TYPES, PAYMENT_TYPES, type Payment, type PaymentInput } from '../types/payment'
+import {
+  MANUAL_PAYMENT_TYPES,
+  PAID_BY_METHODS,
+  PAYMENT_TYPES,
+  type Payment,
+  type PaymentInput,
+} from '../types/payment'
 import { carDisplayLabel, type Car } from '../types/car'
 import type { MaintenanceRecord } from '../types/maintenance'
 import type { CarDoc } from '../types/carDoc'
@@ -98,7 +104,7 @@ function PaymentsPage() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [markPaidPayment, setMarkPaidPayment] = useState<Payment | null>(null)
   const [isMarkingPaid, setIsMarkingPaid] = useState(false)
-  const paidByInputRef = useRef<HTMLInputElement>(null)
+  const paidByInputRef = useRef<HTMLInputElement | HTMLSelectElement>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -490,13 +496,31 @@ function PaymentsPage() {
             </label>
             <label className="form-field">
               <span className="form-field-label">Paid by</span>
-              <input
-                ref={paidByInputRef}
-                type="text"
-                value={form.paid_by}
-                onChange={(event) => setForm((f) => ({ ...f, paid_by: event.target.value }))}
-                required
-              />
+              {form.type === 'monthly_fair' ? (
+                <input
+                  ref={paidByInputRef as RefObject<HTMLInputElement>}
+                  type="text"
+                  value={form.paid_by}
+                  onChange={(event) => setForm((f) => ({ ...f, paid_by: event.target.value }))}
+                  required
+                />
+              ) : (
+                <select
+                  ref={paidByInputRef as RefObject<HTMLSelectElement>}
+                  value={form.paid_by}
+                  onChange={(event) => setForm((f) => ({ ...f, paid_by: event.target.value }))}
+                  required
+                >
+                  <option value="" disabled>
+                    Select payment method
+                  </option>
+                  {PAID_BY_METHODS.map((method) => (
+                    <option key={method} value={method}>
+                      {method}
+                    </option>
+                  ))}
+                </select>
+              )}
             </label>
             <label className="form-field">
               <span className="form-field-label">Paid to</span>

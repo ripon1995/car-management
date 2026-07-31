@@ -1,6 +1,7 @@
 export const PAYMENT_TYPES = ['monthly_fair', 'service', 'document', 'fuel', 'other'] as const
 export const MANUAL_PAYMENT_TYPES = ['other'] as const
 export const PAYMENT_STATUSES = ['paid', 'unpaid'] as const
+export const PAID_BY_METHODS = ['EBL', 'DBBL', 'UCB', 'CASH'] as const
 
 export type PaymentType = (typeof PAYMENT_TYPES)[number]
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number]

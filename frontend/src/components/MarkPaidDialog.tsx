@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import type { Payment, PaymentStatus } from '../types/payment'
+import { PAID_BY_METHODS, type Payment, type PaymentStatus } from '../types/payment'
 
 export interface MarkPaidUpdates {
   status: PaymentStatus
@@ -81,7 +81,20 @@ function MarkPaidDialog({ open, payment, carLabel, typeLabel, isSaving, onSave, 
         </label>
         <label className="form-field">
           <span className="form-field-label">Paid by</span>
-          <input type="text" value={paidBy} onChange={(event) => setPaidBy(event.target.value)} required />
+          {payment.type === 'monthly_fair' ? (
+            <input type="text" value={paidBy} onChange={(event) => setPaidBy(event.target.value)} required />
+          ) : (
+            <select value={paidBy} onChange={(event) => setPaidBy(event.target.value)} required>
+              <option value="" disabled>
+                Select payment method
+              </option>
+              {PAID_BY_METHODS.map((method) => (
+                <option key={method} value={method}>
+                  {method}
+                </option>
+              ))}
+            </select>
+          )}
         </label>
         <label className="form-field">
           <span className="form-field-label">Paid to</span>

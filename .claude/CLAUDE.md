@@ -301,7 +301,16 @@ cross-cutting infrastructure lives outside `app/features/`.
   completeness — only the **frontend** narrows its manual-create dropdown
   to `MANUAL_PAYMENT_TYPES = ['other']` (see Frontend architecture), since
   service/document/fuel/monthly_fair payments are now only ever produced
-  by the auto-creation paths above.
+  by the auto-creation paths above. `paid_by` is constrained too:
+  `PAID_BY_METHODS = ("EBL", "DBBL", "UCB", "CASH")` in `schemas.py` —
+  `PaymentService._validate_paid_by(type, paid_by)` requires `paid_by` be
+  one of these whenever `type != "monthly_fair"` (`monthly_fair` keeps
+  free text, since it's populated from the vendor's name by
+  `generate_due_payments()`, not a payment-method choice). Checked on
+  `create()` and on `update()` whenever `type` or `paid_by` is in the
+  update payload — which, from the frontend, is always, since both
+  `PaymentsPage.tsx`'s forms and `MarkPaidDialog` submit the full
+  `PaymentInput` shape every time.
 - `app/features/revenue/` — read-only, **no `models.py`/migration**:
   `RevenueService.get_summary()` takes the same `car_id`/date-range filters
   as Payments (via `PaymentRepository.list_all()`, additionally passing
@@ -457,7 +466,11 @@ side-effect rather than adding a per-month generate endpoint.
   call sites build a full `PaymentInput` (spreading the source payment's
   other fields, not a partial) before `api.updatePayment(id, ...)`, since
   `updatePayment` takes the complete shape. Reuse this component rather
-  than duplicating the status-change form per page.
+  than duplicating the status-change form per page. `Paid by` renders as a
+  free-text `<input>` when `payment.type === 'monthly_fair'`, otherwise as
+  a `<select>` over `PAID_BY_METHODS` (`src/types/payment.ts` —
+  `['EBL', 'DBBL', 'UCB', 'CASH']`), matching the backend's
+  `_validate_paid_by()`.
 - Shared page-chrome classes live in `App.css` (global, not per-page) since
   every feature page reuses them — add new cross-page primitives there,
   not in a page's own CSS file:
@@ -583,6 +596,12 @@ side-effect rather than adding a per-month generate endpoint.
   auto-creation (Maintenance/Car Docs/Fuel/Income), so manual creation on
   this page is `other`-only; the **edit** form still iterates the full
   `PAYMENT_TYPES` list, since existing rows of any type can land here.
+  The `Paid by` field mirrors `MarkPaidDialog`'s split: a `<select>` over
+  `PAID_BY_METHODS` whenever `form.type !== 'monthly_fair'` (always true
+  in create mode, since create is `other`-only), a free-text `<input>`
+  when editing a `monthly_fair` row. `paidByInputRef` (used to autofocus
+  the field on open) is typed `RefObject<HTMLInputElement |
+  HTMLSelectElement>` to cover both.
   The table has a `Status` column (`.status-badge`) and, for any row with
   `status === 'unpaid'`, a "mark as paid" `.icon-btn` (`CheckIcon` from
   `NavIcons.tsx`) that opens the shared `MarkPaidDialog` (see the

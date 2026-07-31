@@ -28,7 +28,7 @@ the backend endpoint still accepts every `type` for API completeness.
 | car_id                 | uuid (FK)     | yes      | → `cars.id` — **(added)** not in the original field list; needed so `monthly_fair`/`other` payments (which have no associated_maintenance/associated_cardocs to derive a car from) can still be attributed to a car for the Revenue dashboard |
 | amount                 | numeric(12,2) | yes      | **(added)** not in the original field list; required for Revenue math to work regardless of type. For `type = monthly_fair` it is **not** taken from the request — the backend always overwrites it with the linked Lease's `monthly_fare`, so the UI doesn't ask for it at all (see Business Rules). For every other type it's still entered directly on the payment. |
 | payment_date           | date          | yes      | **(added)** not in the original field list; required to group Revenue's bar chart by period (e.g. month) |
-| paid_by                | varchar       | yes      | free text — e.g. vendor/owner name. Auto-created payments (see below) start as an empty string until filled in when the payment is marked paid |
+| paid_by                | varchar       | yes      | enum `EBL`/`DBBL`/`UCB`/`CASH` (**added** 2026-08-01) when `type != monthly_fair`; free text (the vendor's name) when `type = monthly_fair`. Auto-created payments (see below) start as an empty string until filled in when the payment is marked paid |
 | paid_to                | varchar       | yes      | free text — e.g. mechanic/vendor/owner name. Same empty-string-until-marked-paid behavior as `paid_by` for auto-created payments |
 | status                 | varchar       | yes      | **(added)** 2026-08-01, migration `0018`; enum `paid`/`unpaid`. Defaults to `paid` (DB `server_default` + `PaymentCreate` default) — manually-created payments and all pre-existing rows represent already-settled money. Auto-created payments (from Maintenance/Car Docs/Fuel, and Lease's bulk `generate-payments`) are created with `status="unpaid"` explicitly, bypassing this default |
 | description            | text          | no       | |
@@ -84,6 +84,11 @@ the backend endpoint still accepts every `type` for API completeness.
   amount is only knowable via the linked Lease.
 - `status` must be one of `paid`/`unpaid` (`ValidationException`
   otherwise, same shape as the `type` check).
+- `paid_by` must be one of `EBL`/`DBBL`/`UCB`/`CASH` whenever
+  `type != monthly_fair` (`ValidationException` otherwise); no constraint
+  when `type = monthly_fair`, since it holds the vendor's name there, not
+  a payment method. Checked on `create()` and on `update()` whenever
+  `type` or `paid_by` changes.
 - **Auto-creation** (2026-08-01, see `docs/decisions.md`): creating a
   Maintenance, Car Doc, or Fuel record auto-creates its linked Payment
   directly (bypassing this feature's own `create()`/validation) with

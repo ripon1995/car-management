@@ -17,14 +17,14 @@ register_exception_handlers(app)
 # Dev-only: allow the frontend dev server to call the API. Auth is a Bearer
 # token, not cookies, so allow_credentials isn't required for that flow.
 app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.allow_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    CORSMiddleware,  # type: ignore[arg-type]
+    allow_origins=settings.allow_origins,  # type: ignore[arg-type]
+    allow_credentials=True,  # type: ignore[arg-type]
+    allow_methods=["*"],  # type: ignore[arg-type]
+    allow_headers=["*"],  # type: ignore[arg-type]
 )
 
-app.add_middleware(RequestLoggerMiddleware, env_name=settings.environment)
+app.add_middleware(RequestLoggerMiddleware, env_name=settings.environment)  # type: ignore[arg-type]
 
 app.include_router(api_router, prefix=settings.api_v1_prefix)
 

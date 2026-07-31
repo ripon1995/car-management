@@ -33,7 +33,7 @@ const maintenanceTypeLabels: Record<string, string> = {
 }
 
 function maintenanceRecordLabel(record: MaintenanceRecord) {
-  return `${maintenanceTypeLabels[record.type]} — ${record.service_place}`
+  return `${maintenanceTypeLabels[record.type]} — ${record.service_place} — ${record.created_at.slice(0, 10)}`
 }
 
 const docTypeLabels: Record<string, string> = {
@@ -56,7 +56,7 @@ const fuelTypeLabels: Record<string, string> = {
 }
 
 function fuelRecordLabel(record: FuelRecord) {
-  return `${fuelTypeLabels[record.fuel_type]} — ${record.fuel_station}`
+  return `${fuelTypeLabels[record.fuel_type]} — ${record.fuel_station} — ${record.fuel_date}`
 }
 
 const emptyForm: PaymentInput = {
@@ -155,7 +155,7 @@ function PaymentsPage() {
 
   function leaseRecordLabel(lease: Lease) {
     const vendorName = vendors.find((v) => v.id === lease.vendor_id)?.name ?? 'Unknown vendor'
-    return `${vendorName} — ${lease.monthly_fare}/mo`
+    return `${vendorName} — ${lease.monthly_fare}/mo — ${lease.start_date}`
   }
 
   function leaseLabel(id: string | null) {
@@ -269,16 +269,31 @@ function PaymentsPage() {
     }
   }
 
-  const maintenanceOptions = form.car_id
-    ? maintenanceRecords.filter((record) => record.car_id === form.car_id)
-    : maintenanceRecords
-  const carDocOptions = form.car_id ? carDocs.filter((doc) => doc.car_id === form.car_id) : carDocs
-  const fuelOptions = form.car_id
-    ? fuelRecords.filter((record) => record.car_id === form.car_id)
-    : fuelRecords
-  const leaseOptions = form.car_id
-    ? leases.filter((lease) => lease.car_id === form.car_id)
-    : leases
+  function linkedIds(select: (payment: Payment) => string | null) {
+    return new Set(
+      payments
+        .filter((payment) => payment.id !== editingId && select(payment) !== null)
+        .map((payment) => select(payment) as string),
+    )
+  }
+
+  const linkedMaintenanceIds = linkedIds((payment) => payment.associated_maintenance)
+  const linkedCarDocIds = linkedIds((payment) => payment.associated_cardocs)
+  const linkedFuelIds = linkedIds((payment) => payment.associated_fuel)
+  const linkedLeaseIds = linkedIds((payment) => payment.associated_lease)
+
+  const maintenanceOptions = (
+    form.car_id ? maintenanceRecords.filter((record) => record.car_id === form.car_id) : maintenanceRecords
+  ).filter((record) => !linkedMaintenanceIds.has(record.id))
+  const carDocOptions = (form.car_id ? carDocs.filter((doc) => doc.car_id === form.car_id) : carDocs).filter(
+    (doc) => !linkedCarDocIds.has(doc.id),
+  )
+  const fuelOptions = (
+    form.car_id ? fuelRecords.filter((record) => record.car_id === form.car_id) : fuelRecords
+  ).filter((record) => !linkedFuelIds.has(record.id))
+  const leaseOptions = (form.car_id ? leases.filter((lease) => lease.car_id === form.car_id) : leases).filter(
+    (lease) => !linkedLeaseIds.has(lease.id),
+  )
 
   return (
     <main id="content" className="payments-page">

@@ -34,6 +34,7 @@ function IncomePage() {
   const [generatingKey, setGeneratingKey] = useState<string | null>(null)
   const [markPaidPayment, setMarkPaidPayment] = useState<Payment | null>(null)
   const [dialogTitle, setDialogTitle] = useState('Mark as received')
+  const [isSimpleDialog, setIsSimpleDialog] = useState(true)
   const [isMarkingPaid, setIsMarkingPaid] = useState(false)
   const [viewingRow, setViewingRow] = useState<IncomeRow | null>(null)
   const [pendingDelete, setPendingDelete] = useState<Payment | null>(null)
@@ -108,6 +109,7 @@ function IncomePage() {
   async function handleMarkPaidClick(row: IncomeRow) {
     if (row.payment) {
       setDialogTitle('Mark as received')
+      setIsSimpleDialog(true)
       setMarkPaidPayment(row.payment)
       return
     }
@@ -125,6 +127,7 @@ function IncomePage() {
       )
       if (newPayment) {
         setDialogTitle('Mark as received')
+        setIsSimpleDialog(true)
         setMarkPaidPayment(newPayment)
       }
     } catch (err) {
@@ -136,6 +139,7 @@ function IncomePage() {
 
   function openEditDialog(payment: Payment) {
     setDialogTitle('Edit payment')
+    setIsSimpleDialog(false)
     setMarkPaidPayment(payment)
   }
 
@@ -208,6 +212,7 @@ function IncomePage() {
                 <th>Month</th>
                 <th>Amount</th>
                 <th>Status</th>
+                <th>Mark received</th>
                 <th>Action</th>
               </tr>
             </thead>
@@ -226,52 +231,58 @@ function IncomePage() {
                         {isPaid ? 'Received' : 'Not received'}
                       </span>
                     </td>
-                    <td className="data-table-actions">
-                      {row.payment && (
-                        <button
-                          type="button"
-                          className="icon-btn"
-                          aria-label="View payment"
-                          title="View"
-                          onClick={() => setViewingRow(row)}
-                        >
-                          <ViewIcon />
-                        </button>
-                      )}
-                      {row.payment && (
-                        <button
-                          type="button"
-                          className="icon-btn"
-                          aria-label="Edit payment"
-                          title="Edit"
-                          onClick={() => openEditDialog(row.payment as Payment)}
-                        >
-                          <EditIcon />
-                        </button>
-                      )}
-                      {!isPaid && (
-                        <button
-                          type="button"
-                          className="icon-btn"
-                          aria-label="Mark as received"
-                          title="Mark as received"
-                          onClick={() => handleMarkPaidClick(row)}
-                          disabled={generatingKey === row.key}
-                        >
-                          <CheckIcon />
-                        </button>
-                      )}
-                      {row.payment && (
-                        <button
-                          type="button"
-                          className="icon-btn danger"
-                          aria-label="Delete payment"
-                          title="Delete"
-                          onClick={() => setPendingDelete(row.payment)}
-                        >
-                          <DeleteIcon />
-                        </button>
-                      )}
+                    <td>
+                      <div className="data-table-actions">
+                        {!isPaid && (
+                          <button
+                            type="button"
+                            className="icon-btn"
+                            aria-label="Mark as received"
+                            title="Mark as received"
+                            onClick={() => handleMarkPaidClick(row)}
+                            disabled={generatingKey === row.key}
+                          >
+                            <CheckIcon />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      <div className="data-table-actions">
+                        {row.payment && (
+                          <button
+                            type="button"
+                            className="icon-btn"
+                            aria-label="View payment"
+                            title="View"
+                            onClick={() => setViewingRow(row)}
+                          >
+                            <ViewIcon />
+                          </button>
+                        )}
+                        {row.payment && (
+                          <button
+                            type="button"
+                            className="icon-btn"
+                            aria-label="Edit payment"
+                            title="Edit"
+                            onClick={() => openEditDialog(row.payment as Payment)}
+                          >
+                            <EditIcon />
+                          </button>
+                        )}
+                        {row.payment && (
+                          <button
+                            type="button"
+                            className="icon-btn danger"
+                            aria-label="Delete payment"
+                            title="Delete"
+                            onClick={() => setPendingDelete(row.payment)}
+                          >
+                            <DeleteIcon />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )
@@ -374,6 +385,7 @@ function IncomePage() {
         carLabel={markPaidPayment ? carLabel(markPaidPayment.car_id) : ''}
         typeLabel="Monthly fare"
         title={dialogTitle}
+        simple={isSimpleDialog}
         isSaving={isMarkingPaid}
         onSave={confirmMarkPaid}
         onCancel={() => setMarkPaidPayment(null)}

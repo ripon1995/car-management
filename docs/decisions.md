@@ -161,6 +161,41 @@ clicked. Its `status` field now seeds from the target payment's actual
 `status` instead of always defaulting to `'paid'`, since Edit (unlike
 mark-as-received) shouldn't silently flip status just by opening.
 
+**Fourth follow-up, same day:** two more adjustments, both user-requested.
+First, "Mark received" moved out of `IncomePage.tsx`'s `Action` column
+into its own dedicated column — it's the page's primary/most-frequent
+action and the user wanted it visually distinct from View/Edit/Delete,
+not bundled in as a fourth icon among them. Second, the popup that
+opens for mark-as-received was simplified to only Status/Payment date/
+Description — Amount/Car/Type/Paid by/Paid to don't need to be shown or
+re-entered there, since `generate_due_payments()` already populates them
+correctly (`paid_by`/`paid_to` = vendor/owner name) and the quick action
+is just confirming receipt, not editing the record. This did **not**
+extend to `PaymentsPage.tsx`'s own "mark as paid" action or to Income's
+Edit action — both still need the full form, since `PaymentsPage.tsx`'s
+auto-created service/document/fuel payments start with genuinely blank
+`paid_by`/`paid_to` that must be filled in, and Edit is meant to allow
+correcting any field, not just confirming receipt. Implemented as a
+`simple?: boolean` prop on `MarkPaidDialog.tsx` (default `false`, full
+form) rather than a second dialog component, since the fields shown are
+a strict subset and the modal shell/keyboard/save-handler logic is
+otherwise identical.
+
+**Bug found while building the above, same day:** splitting "Mark
+received" into its own column broke the table's layout — each row split
+into two overlapping horizontal bands instead of rendering as one line.
+Root cause, confirmed via `getBoundingClientRect()` in a live browser
+session rather than guessed: `.data-table-actions` (used for every page's
+Action column) sets `display: flex` directly on the `<td>`. That's
+harmless with one such cell per row (every other page), but `IncomePage.tsx`
+now has two (`Mark received` + `Action`) — with two flex `<td>`s in the
+same row, the browser's table column-layout algorithm collapses both
+cells onto the same column slot and stacks them vertically instead of
+placing them side by side as separate columns. Fixed by keeping the `<td>`
+as a normal table cell and moving the flex styling onto a child `<div
+className="data-table-actions">` instead — worth remembering if a third
+action-bearing column is ever added to any table in this app.
+
 ## Frontend form-field labeling: why placeholder-only fields were removed
 
 Every form field was originally allowed to rely on `placeholder` text

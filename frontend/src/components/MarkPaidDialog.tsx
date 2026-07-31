@@ -15,6 +15,10 @@ interface MarkPaidDialogProps {
   carLabel: string
   typeLabel: string
   title?: string
+  /** When true, only Status/Payment date/Description are shown — for a quick
+   * status confirmation where Amount/Car/Type/Paid by/Paid to are already
+   * correct and don't need re-entry (e.g. Income's "mark as received"). */
+  simple?: boolean
   isSaving: boolean
   onSave: (updates: MarkPaidUpdates) => void
   onCancel: () => void
@@ -26,6 +30,7 @@ function MarkPaidDialog({
   carLabel,
   typeLabel,
   title = 'Mark payment as paid',
+  simple = false,
   isSaving,
   onSave,
   onCancel,
@@ -79,18 +84,22 @@ function MarkPaidDialog({
         onSubmit={handleSubmit}
       >
         <h2 id="mark-paid-title">{title}</h2>
-        <label className="form-field">
-          <span className="form-field-label">Amount</span>
-          <span>{payment.amount}</span>
-        </label>
-        <label className="form-field">
-          <span className="form-field-label">Car</span>
-          <span>{carLabel}</span>
-        </label>
-        <label className="form-field">
-          <span className="form-field-label">Type</span>
-          <span>{typeLabel}</span>
-        </label>
+        {!simple && (
+          <>
+            <label className="form-field">
+              <span className="form-field-label">Amount</span>
+              <span>{payment.amount}</span>
+            </label>
+            <label className="form-field">
+              <span className="form-field-label">Car</span>
+              <span>{carLabel}</span>
+            </label>
+            <label className="form-field">
+              <span className="form-field-label">Type</span>
+              <span>{typeLabel}</span>
+            </label>
+          </>
+        )}
         <label className="form-field">
           <span className="form-field-label">Status</span>
           <select value={status} onChange={(event) => setStatus(event.target.value as PaymentStatus)} required>
@@ -98,27 +107,31 @@ function MarkPaidDialog({
             <option value="unpaid">Unpaid</option>
           </select>
         </label>
-        <label className="form-field">
-          <span className="form-field-label">Paid by</span>
-          {payment.type === 'monthly_fair' ? (
-            <input type="text" value={paidBy} onChange={(event) => setPaidBy(event.target.value)} required />
-          ) : (
-            <select value={paidBy} onChange={(event) => setPaidBy(event.target.value)} required>
-              <option value="" disabled>
-                Select payment method
-              </option>
-              {PAID_BY_METHODS.map((method) => (
-                <option key={method} value={method}>
-                  {method}
-                </option>
-              ))}
-            </select>
-          )}
-        </label>
-        <label className="form-field">
-          <span className="form-field-label">Paid to</span>
-          <input type="text" value={paidTo} onChange={(event) => setPaidTo(event.target.value)} required />
-        </label>
+        {!simple && (
+          <>
+            <label className="form-field">
+              <span className="form-field-label">Paid by</span>
+              {payment.type === 'monthly_fair' ? (
+                <input type="text" value={paidBy} onChange={(event) => setPaidBy(event.target.value)} required />
+              ) : (
+                <select value={paidBy} onChange={(event) => setPaidBy(event.target.value)} required>
+                  <option value="" disabled>
+                    Select payment method
+                  </option>
+                  {PAID_BY_METHODS.map((method) => (
+                    <option key={method} value={method}>
+                      {method}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </label>
+            <label className="form-field">
+              <span className="form-field-label">Paid to</span>
+              <input type="text" value={paidTo} onChange={(event) => setPaidTo(event.target.value)} required />
+            </label>
+          </>
+        )}
         <label className="form-field">
           <span className="form-field-label">Payment date</span>
           <input

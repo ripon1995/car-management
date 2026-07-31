@@ -400,35 +400,54 @@ per (lease, month) from the union of each lease's `due_months`/
 (for `status`/`id`/`amount`) and rendering due-but-not-yet-generated
 months as synthetic "Not received" rows (`row.payment === null`).
 
-A row's Action column depends on whether it has a real `Payment` behind
-it (added 2026-08-01, see `docs/decisions.md` — Income is where
-`monthly_fair` payments are viewed/edited/deleted now, since
-`PaymentsPage.tsx` excludes that type entirely):
-- **Synthetic row** (not yet generated): a single "Mark as received"
-  `.icon-btn` that calls `POST /leases/{id}/generate-payments` (bulk —
-  generates every due month for that lease, not just the clicked one,
-  accepted as a minor UX side-effect rather than adding a per-month
+The table has **two** action-bearing columns, not one (added 2026-08-01,
+see `docs/decisions.md`) — "Mark received" is its own column, separate
+from the `Action` column, since it's the primary/most-frequent action on
+this page and the user wanted it visually distinct from
+View/Edit/Delete rather than bundled in with them. **Gotcha:** each such
+`<td>` wraps its button(s) in an inner `<div className="data-table-actions">`
+rather than putting that class directly on the `<td>` itself — every
+other page's single Action column applies `.data-table-actions`
+(`display: flex`) straight to the `<td>`, which works fine with one such
+cell per row, but with *two* flex `<td>`s in the same row, browsers'
+table column-layout algorithm breaks: both cells collapse onto the same
+column slot and stack vertically instead of sitting side by side (visible
+as the row splitting into two overlapping horizontal bands). Confirmed via
+`getBoundingClientRect()` on the live page, not guessed — if a third
+action-bearing column is ever added anywhere, keep `display:flex` off the
+`<td>` itself and put it on a child `<div>` instead:
+- **"Mark received" column**: for a synthetic row (not yet generated), a
+  single `.icon-btn` that calls `POST /leases/{id}/generate-payments`
+  (bulk — generates every due month for that lease, not just the clicked
+  one, accepted as a minor UX side-effect rather than adding a per-month
   generate endpoint), refetches due-payments + `monthly_fair` payments,
   then opens `MarkPaidDialog` for the newly-created payment matching that
-  month.
-- **Real, `unpaid` row**: View/Edit/"Mark as received"/Delete, matching
-  `PaymentsPage.tsx`'s table's icon set and order.
-- **Real, `paid` row**: View/Edit/Delete only (no mark-as-received action,
-  already received).
-View opens a read-only `<dl className="detail-list">` modal
-(`viewingRow: IncomeRow | null` state, keyed off the row rather than just
-the `Payment` so Car/Vendor/Month can be shown even though those live on
-the row's `Lease`, not the `Payment` itself) with an "Edit" button in its
-footer that closes the view and opens the edit dialog. Edit reuses
-`MarkPaidDialog` (see the Mark-paid dialog bullet) with `title="Edit
-payment"` instead of the default "Mark payment as paid" — same dialog,
-same `confirmMarkPaid()` handler as the mark-as-received flow, just a
-different opening title (`dialogTitle` state) and trigger. Delete uses
-the standard `ConfirmDialog`/`pendingDelete`/`isDeleting` pattern (see
-the Confirm dialog bullet), calling `api.deletePayment()`; deleting a
-generated monthly-fair payment also refetches that lease's due-payments
-so the row reverts to a synthetic "not generated" one instead of vanishing
-or going stale.
+  month. For a real `unpaid` row, the same icon opens `MarkPaidDialog`
+  directly for that row's `Payment`. Empty (no button) for a `paid` row.
+  This flow always opens the dialog with `simple` (see the Mark-paid
+  dialog bullet) — Amount/Car/Type/Paid by/Paid to are already correct
+  (populated by `generate_due_payments()`), so the popup only asks for
+  Status/Payment date/Description, not a full edit form.
+- **`Action` column**: View/Edit/Delete, shown only for rows with a real
+  `Payment` (a synthetic row has nothing to view/edit/delete yet). View
+  opens a read-only `<dl className="detail-list">` modal (`viewingRow:
+  IncomeRow | null` state, keyed off the row rather than just the
+  `Payment` so Car/Vendor/Month can be shown even though those live on
+  the row's `Lease`, not the `Payment` itself) with an "Edit" button in
+  its footer that closes the view and opens the edit dialog. Edit reuses
+  `MarkPaidDialog` **without** `simple` — the full Amount/Car/Type/Status/
+  Paid by/Paid to/Payment date/Description form, `title="Edit payment"`
+  instead of the default "Mark payment as paid" — since editing may
+  legitimately need to correct `paid_by`/`paid_to`, unlike the quick
+  mark-received confirmation. Same `confirmMarkPaid()` handler either way,
+  just a different opening `title`/`simple` combination
+  (`dialogTitle`/`isSimpleDialog` state) depending on which action
+  triggered it. Delete uses the standard
+  `ConfirmDialog`/`pendingDelete`/`isDeleting` pattern (see the Confirm
+  dialog bullet), calling `api.deletePayment()`; deleting a generated
+  monthly-fare payment also refetches that lease's due-payments so the
+  row reverts to a synthetic "not generated" one instead of vanishing or
+  going stale.
 
 - `src/api/client.ts` — `request<T>(path, options)` (fetch wrapper: base
   URL, JSON headers, error → `ApiError` mapping, 401 →
@@ -488,15 +507,21 @@ or going stale.
   "mark as received" and its Edit action (added 2026-08-01, since
   `monthly_fair` payments are edited only from Income now — see
   `docs/decisions.md`), passing a `title` prop (`'Mark as received'` vs
-  `'Edit payment'`, default `'Mark payment as paid'`) to distinguish them
-  — same fields, same `confirmMarkPaid()` handler either way. Standard
-  `.modal-backdrop`/`.modal-panel.card`/`.form-field` shell; read-only
-  Amount/Car/Type plus editable `status`/`paid_by`/`paid_to`/
-  `payment_date`/`description` fields, seeded from the target `Payment`
-  prop via a `useEffect` keyed on `payment?.id` (`status` seeds from
-  `payment.status`, not hardcoded to `'paid'`, so opening it to edit an
-  already-paid or still-unpaid row shows its real status rather than
-  silently flipping it). Both call sites build a full `PaymentInput`
+  `'Edit payment'`, default `'Mark payment as paid'`) to distinguish them,
+  plus a `simple?: boolean` prop for its mark-as-received call only
+  (`IncomePage.tsx`'s `isSimpleDialog` state) that hides the read-only
+  Amount/Car/Type fields and the editable `paid_by`/`paid_to` fields —
+  those are already correct from `generate_due_payments()`, so the quick
+  confirmation only shows Status/Payment date/Description. Its Edit call
+  and `PaymentsPage.tsx`'s "mark as paid" call both leave `simple` unset
+  (full form), since `PaymentsPage.tsx`'s auto-created payments start
+  with blank `paid_by`/`paid_to` that genuinely need entering. Standard
+  `.modal-backdrop`/`.modal-panel.card`/`.form-field` shell; fields are
+  seeded from the target `Payment` prop via a `useEffect` keyed on
+  `payment?.id` (`status` seeds from `payment.status`, not hardcoded to
+  `'paid'`, so opening it to edit an already-paid or still-unpaid row
+  shows its real status rather than silently flipping it). Both pages'
+  call sites build a full `PaymentInput`
   (spreading the source payment's other fields, not a partial) before
   `api.updatePayment(id, ...)`, since `updatePayment` takes the complete
   shape. Reuse this component rather than duplicating the status-change

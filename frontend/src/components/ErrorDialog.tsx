@@ -44,13 +44,6 @@ function ErrorDialog({ error, onClose }: ErrorDialogProps) {
         <p id="error-dialog-detail" className="error-dialog-detail">
           {error.detail}
         </p>
-        {(error.errorCode || error.status) && (
-          <p className="error-dialog-meta">
-            {[error.errorCode, error.status ? `Status ${error.status}` : null]
-              .filter(Boolean)
-              .join(' · ')}
-          </p>
-        )}
         <button ref={closeButtonRef} type="button" className="error-dialog-close" onClick={onClose}>
           Close
         </button>

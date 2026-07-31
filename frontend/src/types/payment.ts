@@ -1,4 +1,4 @@
-export const PAYMENT_TYPES = ['monthly_fair', 'service', 'document', 'fuel', 'other'] as const
+export const PAYMENT_TYPES = ['service', 'document', 'fuel', 'other'] as const
 export const MANUAL_PAYMENT_TYPES = ['other'] as const
 export const PAYMENT_STATUSES = ['paid', 'unpaid'] as const
 export const PAID_BY_METHODS = ['EBL', 'DBBL', 'UCB', 'CASH'] as const
@@ -12,7 +12,6 @@ export interface Payment {
   associated_maintenance: string | null
   associated_cardocs: string | null
   associated_fuel: string | null
-  associated_lease: string | null
   car_id: string
   amount: number
   payment_date: string
@@ -29,7 +28,6 @@ export interface PaymentInput {
   associated_maintenance?: string | null
   associated_cardocs?: string | null
   associated_fuel?: string | null
-  associated_lease?: string | null
   car_id: string
   amount: number
   payment_date: string

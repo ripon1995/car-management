@@ -3,6 +3,8 @@ import uuid
 from fastapi import APIRouter, Depends, status
 
 from app.features.auth.dependencies import get_current_user
+from app.features.income.models import Income
+from app.features.income.schemas import IncomeRead
 from app.features.leases.models import Lease
 from app.features.leases.schemas import (
     DuePaymentsRead,
@@ -11,8 +13,6 @@ from app.features.leases.schemas import (
     LeaseUpdate,
 )
 from app.features.leases.service import LeaseService, get_lease_service
-from app.features.payments.models import Payment
-from app.features.payments.schemas import PaymentRead
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 
@@ -64,8 +64,8 @@ async def get_due_payments(
     return await service.get_due_payments(lease_id)
 
 
-@router.post("/{lease_id}/generate-payments", response_model=list[PaymentRead])
+@router.post("/{lease_id}/generate-payments", response_model=list[IncomeRead])
 async def generate_due_payments(
     lease_id: uuid.UUID, service: LeaseService = Depends(get_lease_service)
-) -> list[Payment]:
-    return await service.generate_due_payments(lease_id)
+) -> list[Income]:
+    return await service.generate_due_income(lease_id)

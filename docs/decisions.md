@@ -239,3 +239,86 @@ by-period grouped bar chart are hand-rolled inline SVG rather than pulling
 in a charting library. If a future feature needs another chart, reuse this
 hand-rolled-SVG approach rather than introducing a chart library without
 checking with the user first.
+
+## Income: from a computed frontend-only view to a real backend model (2026-08-01)
+
+The 2026-08-01 entry above ("Payment auto-creation...") describes Income
+being built as a **computed, no-model view** over Lease + Payment — no
+`app/features/income/` package, no migration, `monthly_fair` was just one
+`Payment.type` value with a mandatory `associated_lease` FK. Later the
+same day, the user explicitly reversed that: "it should be a separate
+model called Income", and on being asked to scope it, chose the option
+where **Income replaces `monthly_fair` Payment entirely** (not a
+due-months cache sitting alongside Payment, and not a generic all-income
+ledger beyond lease rent).
+
+This is a real, standalone `app/features/income/` package now
+(model/schemas/repository/service/router, mounted at `/income`), following
+the same repository→service→router layering as every other feature.
+`Income` carries `lease_id` (required FK → `leases.id`), `car_id` (required
+FK → `cars.id`, denormalized like `Payment.car_id` for filtering),
+`amount`, `payment_date`, `paid_by`, `paid_to`, `status`
+(`paid`/`unpaid`, default `unpaid`), `description`. Unlike the old
+`monthly_fair` Payment, `car_id` is **not** user-supplied on
+`POST`/`PUT /income` — `IncomeService` derives it from the linked Lease
+every time (same as `amount`, always overwritten from
+`lease.monthly_fare`), removing a redundant dual-source-of-truth field
+that the old `PaymentCreate` shape had (`car_id` *and*
+`associated_lease` both supplied by the caller, with no check that they
+agreed).
+
+Payment lost `type == "monthly_fair"` and the `associated_lease` column
+entirely — `PAYMENT_TYPES` is now `("service", "document", "fuel",
+"other")`, and `PaymentService._validate_paid_by()` no longer has a
+monthly_fair exception (every Payment now requires a real
+`PAID_BY_METHODS` value; free-text `paid_by` lives only on Income, since
+that field there is always the vendor's name, not a payment method).
+`LeaseService` swapped its `PaymentRepository` dependency for
+`IncomeRepository`: `get_due_payments()` now checks the `income` table
+(via `Income.lease_id`) instead of `Payment.associated_lease` for which
+months are already generated, and the bulk-generate method (renamed
+`generate_due_income()` internally, though the route path stayed
+`POST /{id}/generate-payments` to avoid an unnecessary URL churn on top of
+an already-large refactor) creates `Income` rows instead of `Payment`
+rows. `LeaseService.delete()`'s linked-record block now checks Income
+instead of Payment.
+
+`RevenueService` (still no table/migration of its own) now reads from
+**both** repositories: paid `Income` rows are summed as income, paid
+`Payment` rows as expense — and every Income-derived contribution is
+still tagged with the string `"monthly_fair"` in `by_type`/output shape,
+so `RevenueSummary`'s schema and the frontend's existing
+`INCOME_TYPE`/`typeLabels`/`typeColors` constants in `DashboardPage.tsx`
+didn't need to change at all, only where the numbers come from
+server-side.
+
+**Migration mechanics:** `0019_create_income.py` creates the `income`
+table (mirroring `0008_create_payments.py`'s shape/index pattern).
+`0020_migrate_monthly_fair_to_income.py` does the one-time data move —
+`INSERT INTO income SELECT ... FROM payments WHERE type = 'monthly_fair'`,
+then `DELETE FROM payments WHERE type = 'monthly_fair'`, then
+`op.drop_column("payments", "associated_lease")` (Postgres drops the
+attached FK constraint automatically along with the column, same as
+`0016`/`0017`'s add/rename of that column never needed an explicit
+constraint-name step). The downgrade re-adds the column and copies rows
+back from `income` to `payments`, but doesn't attempt to delete them out
+of `income` first — a full downgrade chain relies on `0019`'s own
+downgrade to drop the whole `income` table afterward, so leaving those
+rows in place is harmless.
+
+**Frontend:** `IncomePage.tsx` keeps its exact prior shape (synthetic
+"not yet generated" rows computed from Lease's due-payments endpoint,
+merged with real records) — only the "real record" type changed from
+`Payment` to the new `Income` type (`src/types/income.ts` +
+`src/api/income.ts`). `MarkPaidDialog.tsx` — previously typed strictly
+to `Payment` and keying its Paid-by free-text-vs-select choice off
+`payment.type === 'monthly_fair'` — was generalized to a `MarkPaidTarget`
+shape (the fields it actually reads: `status`/`paid_by`/`paid_to`/
+`payment_date`/`description`/`amount`) plus an explicit `paidByAsText?`
+prop, since `Income` has no `type` field to key off of.
+`DashboardPage.tsx`'s filtered drill-down table now fetches paid `Income`
+alongside paid `Payment` and merges both into one sorted, signed row list
+client-side, mirroring `RevenueService`'s server-side combination — keep
+both fetches in sync (car/date/status filters) with `RevenueService` if
+either side's filtering logic changes, same reasoning as the
+`status: 'paid'` fix in the entry above.

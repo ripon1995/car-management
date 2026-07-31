@@ -7,6 +7,7 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
+from app.features.income.repository import IncomeRepository
 from app.features.payments.repository import PaymentRepository
 from app.features.revenue.schemas import (
     RevenueCarBreakdown,
@@ -19,10 +20,12 @@ INCOME_TYPE = "monthly_fair"
 
 
 class RevenueService:
-    """Read-only aggregation over Payment records. No writes, no table of its own."""
+    """Read-only aggregation over Payment (expense) and Income (lease rent) records.
+    No table/writes of its own."""
 
-    def __init__(self, repository: PaymentRepository) -> None:
-        self.repository = repository
+    def __init__(self, payment_repository: PaymentRepository, income_repository: IncomeRepository) -> None:
+        self.payment_repository = payment_repository
+        self.income_repository = income_repository
 
     async def get_summary(
         self,
@@ -30,7 +33,10 @@ class RevenueService:
         date_from: date | None = None,
         date_to: date | None = None,
     ) -> RevenueSummary:
-        payments = await self.repository.list_all(
+        payments = await self.payment_repository.list_all(
+            car_id=car_id, date_from=date_from, date_to=date_to, status="paid"
+        )
+        incomes = await self.income_repository.list_all(
             car_id=car_id, date_from=date_from, date_to=date_to, status="paid"
         )
 
@@ -44,18 +50,19 @@ class RevenueService:
             lambda: {"income": Decimal("0"), "expense": Decimal("0")}
         )
 
-        for payment in payments:
-            is_income = payment.type == INCOME_TYPE
-            if is_income:
-                total_income += payment.amount
-            else:
-                total_expense += payment.amount
-            by_type[payment.type] += payment.amount
+        for income in incomes:
+            total_income += income.amount
+            by_type[INCOME_TYPE] += income.amount
+            period = income.payment_date.strftime("%Y-%m")
+            by_period[period]["income"] += income.amount
+            by_car[income.car_id]["income"] += income.amount
 
+        for payment in payments:
+            total_expense += payment.amount
+            by_type[payment.type] += payment.amount
             period = payment.payment_date.strftime("%Y-%m")
-            bucket = "income" if is_income else "expense"
-            by_period[period][bucket] += payment.amount
-            by_car[payment.car_id][bucket] += payment.amount
+            by_period[period]["expense"] += payment.amount
+            by_car[payment.car_id]["expense"] += payment.amount
 
         return RevenueSummary(
             total_income=total_income,
@@ -91,4 +98,4 @@ class RevenueService:
 
 
 def get_revenue_service(db: AsyncSession = Depends(get_db)) -> RevenueService:
-    return RevenueService(PaymentRepository(db))
+    return RevenueService(PaymentRepository(db), IncomeRepository(db))

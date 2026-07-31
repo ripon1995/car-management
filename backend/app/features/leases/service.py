@@ -10,10 +10,10 @@ from app.core.exceptions import ConflictException, NotFoundException, Validation
 from app.db.session import get_db
 from app.features.car_owners.repository import CarOwnerRepository
 from app.features.cars.repository import CarRepository
+from app.features.income.repository import IncomeRepository
 from app.features.leases.models import Lease
 from app.features.leases.repository import LeaseRepository
 from app.features.leases.schemas import DuePaymentsRead, LeaseCreate, LeaseUpdate
-from app.features.payments.repository import PaymentRepository
 from app.features.vendors.repository import VendorRepository
 
 
@@ -38,13 +38,13 @@ class LeaseService:
         car_repository: CarRepository,
         vendor_repository: VendorRepository,
         car_owner_repository: CarOwnerRepository,
-        payment_repository: PaymentRepository,
+        income_repository: IncomeRepository,
     ) -> None:
         self.repository = repository
         self.car_repository = car_repository
         self.vendor_repository = vendor_repository
         self.car_owner_repository = car_owner_repository
-        self.payment_repository = payment_repository
+        self.income_repository = income_repository
 
     async def create(self, payload: LeaseCreate) -> Lease:
         self._validate_fare(payload.monthly_fare)
@@ -88,31 +88,31 @@ class LeaseService:
 
     async def delete(self, lease_id: uuid.UUID) -> None:
         lease = await self.get_by_id(lease_id)
-        from app.features.payments.models import Payment
+        from app.features.income.models import Income
 
-        linked_payment = await self.repository.db.scalar(
-            select(Payment.id).where(Payment.associated_lease == lease_id).limit(1)
+        linked_income = await self.repository.db.scalar(
+            select(Income.id).where(Income.lease_id == lease_id).limit(1)
         )
-        if linked_payment is not None:
-            raise ConflictException("Cannot delete a lease that has a linked payment")
+        if linked_income is not None:
+            raise ConflictException("Cannot delete a lease that has linked income")
         await self.repository.delete(lease)
 
     async def get_due_payments(self, lease_id: uuid.UUID) -> DuePaymentsRead:
         lease = await self.get_by_id(lease_id)
-        from app.features.payments.models import Payment
+        from app.features.income.models import Income
 
         today = date.today()
         effective_end = min(lease.end_date, today) if lease.end_date else today
         all_months = _month_range(lease.start_date, effective_end)
 
         result = await self.repository.db.scalars(
-            select(Payment.payment_date).where(Payment.associated_lease == lease_id)
+            select(Income.payment_date).where(Income.lease_id == lease_id)
         )
         generated_months = sorted({payment_date.strftime("%Y-%m") for payment_date in result.all()})
         due_months = [month for month in all_months if month not in generated_months]
         return DuePaymentsRead(due_months=due_months, generated_months=generated_months)
 
-    async def generate_due_payments(self, lease_id: uuid.UUID) -> list:
+    async def generate_due_income(self, lease_id: uuid.UUID) -> list:
         lease = await self.get_by_id(lease_id)
         due = await self.get_due_payments(lease_id)
         if not due.due_months:
@@ -125,17 +125,16 @@ class LeaseService:
         created = []
         for month in due.due_months:
             year, month_num = (int(part) for part in month.split("-"))
-            payment = await self.payment_repository.create(
-                type="monthly_fair",
+            income = await self.income_repository.create(
+                lease_id=lease.id,
                 car_id=lease.car_id,
                 amount=lease.monthly_fare,
                 payment_date=date(year, month_num, 1),
                 paid_by=vendor.name,
                 paid_to=owner.name,
-                associated_lease=lease.id,
                 status="unpaid",
             )
-            created.append(payment)
+            created.append(income)
         return created
 
     @staticmethod
@@ -170,5 +169,5 @@ def get_lease_service(db: AsyncSession = Depends(get_db)) -> LeaseService:
         CarRepository(db),
         VendorRepository(db),
         CarOwnerRepository(db),
-        PaymentRepository(db),
+        IncomeRepository(db),
     )

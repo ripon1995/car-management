@@ -28,8 +28,6 @@ const typeLabels: Record<string, string> = {
   other: 'Other',
 }
 
-const EDITABLE_PAYMENT_TYPES = PAYMENT_TYPES.filter((type) => type !== 'monthly_fair')
-
 const maintenanceTypeLabels: Record<string, string> = {
   service: 'Service',
   battery: 'Battery',
@@ -70,7 +68,6 @@ const emptyForm: PaymentInput = {
   associated_maintenance: null,
   associated_cardocs: null,
   associated_fuel: null,
-  associated_lease: null,
   car_id: '',
   amount: 0,
   payment_date: todayIso,
@@ -136,7 +133,7 @@ function PaymentsPage() {
     api
       .listPayments({ carId: filterCarId || undefined, dateFrom, dateTo })
       .then((data) => {
-        if (!cancelled) setPayments(data.filter((payment) => payment.type !== 'monthly_fair'))
+        if (!cancelled) setPayments(data)
       })
       .catch((err) => {
         if (!cancelled) setError(toApiError(err))
@@ -187,7 +184,6 @@ function PaymentsPage() {
       associated_maintenance: payment.associated_maintenance,
       associated_cardocs: payment.associated_cardocs,
       associated_fuel: payment.associated_fuel,
-      associated_lease: payment.associated_lease,
       car_id: payment.car_id,
       amount: payment.amount,
       payment_date: payment.payment_date,
@@ -282,7 +278,6 @@ function PaymentsPage() {
         associated_maintenance: markPaidPayment.associated_maintenance,
         associated_cardocs: markPaidPayment.associated_cardocs,
         associated_fuel: markPaidPayment.associated_fuel,
-        associated_lease: markPaidPayment.associated_lease,
         car_id: markPaidPayment.car_id,
         amount: markPaidPayment.amount,
         ...updates,
@@ -374,7 +369,7 @@ function PaymentsPage() {
                 onChange={(event) => handleTypeChange(event.target.value as PaymentInput['type'])}
                 required
               >
-                {(editingId ? EDITABLE_PAYMENT_TYPES : MANUAL_PAYMENT_TYPES).map((type) => (
+                {(editingId ? PAYMENT_TYPES : MANUAL_PAYMENT_TYPES).map((type) => (
                   <option key={type} value={type}>
                     {typeLabels[type]}
                   </option>

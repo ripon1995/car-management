@@ -5,7 +5,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import { ApiError } from '../errors/api'
 import * as api from '../api'
 import type { DuePayments, Lease } from '../types/lease'
-import type { Payment } from '../types/payment'
+import type { Income, IncomeInput } from '../types/income'
 import { carDisplayLabel, type Car } from '../types/car'
 import type { Vendor } from '../types/vendor'
 import Loader from '../components/Loader'
@@ -16,7 +16,7 @@ interface IncomeRow {
   key: string
   lease: Lease
   month: string
-  payment: Payment | null
+  income: Income | null
 }
 
 function toApiError(err: unknown): ApiError {
@@ -27,17 +27,17 @@ function IncomePage() {
   const [leases, setLeases] = useState<Lease[]>([])
   const [cars, setCars] = useState<Car[]>([])
   const [vendors, setVendors] = useState<Vendor[]>([])
-  const [payments, setPayments] = useState<Payment[]>([])
+  const [incomeRecords, setIncomeRecords] = useState<Income[]>([])
   const [dueByLease, setDueByLease] = useState<Map<string, DuePayments>>(new Map())
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<ApiError | null>(null)
   const [generatingKey, setGeneratingKey] = useState<string | null>(null)
-  const [markPaidPayment, setMarkPaidPayment] = useState<Payment | null>(null)
+  const [markPaidIncome, setMarkPaidIncome] = useState<Income | null>(null)
   const [dialogTitle, setDialogTitle] = useState('Mark as received')
   const [isSimpleDialog, setIsSimpleDialog] = useState(true)
   const [isMarkingPaid, setIsMarkingPaid] = useState(false)
   const [viewingRow, setViewingRow] = useState<IncomeRow | null>(null)
-  const [pendingDelete, setPendingDelete] = useState<Payment | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<Income | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [filterCarId, setFilterCarId] = useState('')
   const [filterMonth, setFilterMonth] = useState('')
@@ -52,13 +52,13 @@ function IncomePage() {
   useEffect(() => {
     let cancelled = false
     setIsLoading(true)
-    Promise.all([api.listLeases(), api.listCars(), api.listVendors(), api.listPayments({ type: 'monthly_fair' })])
-      .then(async ([leasesData, carsData, vendorsData, paymentsData]) => {
+    Promise.all([api.listLeases(), api.listCars(), api.listVendors(), api.listIncome()])
+      .then(async ([leasesData, carsData, vendorsData, incomeData]) => {
         if (cancelled) return
         setLeases(leasesData)
         setCars(carsData)
         setVendors(vendorsData)
-        setPayments(paymentsData)
+        setIncomeRecords(incomeData)
         await loadDueStatus(leasesData)
       })
       .catch((err) => {
@@ -98,15 +98,15 @@ function IncomePage() {
       if (!due) continue
       const months = [...new Set([...due.generated_months, ...due.due_months])].sort()
       for (const month of months) {
-        const payment =
-          payments.find(
-            (p) => p.associated_lease === lease.id && p.payment_date.slice(0, 7) === month,
+        const income =
+          incomeRecords.find(
+            (i) => i.lease_id === lease.id && i.payment_date.slice(0, 7) === month,
           ) ?? null
-        result.push({ key: `${lease.id}:${month}`, lease, month, payment })
+        result.push({ key: `${lease.id}:${month}`, lease, month, income })
       }
     }
     return result.sort((a, b) => (a.month < b.month ? -1 : a.month > b.month ? 1 : 0))
-  }, [leases, dueByLease, payments])
+  }, [leases, dueByLease, incomeRecords])
 
   const filteredRows = useMemo(
     () =>
@@ -118,28 +118,28 @@ function IncomePage() {
   )
 
   async function handleMarkPaidClick(row: IncomeRow) {
-    if (row.payment) {
+    if (row.income) {
       setDialogTitle('Mark as received')
       setIsSimpleDialog(true)
-      setMarkPaidPayment(row.payment)
+      setMarkPaidIncome(row.income)
       return
     }
     setGeneratingKey(row.key)
     try {
       await api.generateDuePayments(row.lease.id)
-      const [refreshedDue, refreshedPayments] = await Promise.all([
+      const [refreshedDue, refreshedIncome] = await Promise.all([
         api.getDuePayments(row.lease.id),
-        api.listPayments({ type: 'monthly_fair' }),
+        api.listIncome(),
       ])
       setDueByLease((prev) => new Map(prev).set(row.lease.id, refreshedDue))
-      setPayments(refreshedPayments)
-      const newPayment = refreshedPayments.find(
-        (p) => p.associated_lease === row.lease.id && p.payment_date.slice(0, 7) === row.month,
+      setIncomeRecords(refreshedIncome)
+      const newIncome = refreshedIncome.find(
+        (i) => i.lease_id === row.lease.id && i.payment_date.slice(0, 7) === row.month,
       )
-      if (newPayment) {
+      if (newIncome) {
         setDialogTitle('Mark as received')
         setIsSimpleDialog(true)
-        setMarkPaidPayment(newPayment)
+        setMarkPaidIncome(newIncome)
       }
     } catch (err) {
       setError(toApiError(err))
@@ -148,23 +148,20 @@ function IncomePage() {
     }
   }
 
-  function openEditDialog(payment: Payment) {
+  function openEditDialog(income: Income) {
     setDialogTitle('Edit payment')
     setIsSimpleDialog(false)
-    setMarkPaidPayment(payment)
+    setMarkPaidIncome(income)
   }
 
-  async function confirmDeletePayment() {
+  async function confirmDeleteIncome() {
     if (!pendingDelete) return
     setIsDeleting(true)
     try {
-      await api.deletePayment(pendingDelete.id)
-      setPayments((prev) => prev.filter((payment) => payment.id !== pendingDelete.id))
-      const leaseId = pendingDelete.associated_lease
-      if (leaseId) {
-        const refreshedDue = await api.getDuePayments(leaseId)
-        setDueByLease((prev) => new Map(prev).set(leaseId, refreshedDue))
-      }
+      await api.deleteIncome(pendingDelete.id)
+      setIncomeRecords((prev) => prev.filter((income) => income.id !== pendingDelete.id))
+      const refreshedDue = await api.getDuePayments(pendingDelete.lease_id)
+      setDueByLease((prev) => new Map(prev).set(pendingDelete.lease_id, refreshedDue))
     } catch (err) {
       setError(toApiError(err))
     } finally {
@@ -174,22 +171,16 @@ function IncomePage() {
   }
 
   async function confirmMarkPaid(updates: MarkPaidUpdates) {
-    if (!markPaidPayment) return
+    if (!markPaidIncome) return
     setIsMarkingPaid(true)
     try {
-      const payload = {
-        type: markPaidPayment.type,
-        associated_maintenance: markPaidPayment.associated_maintenance,
-        associated_cardocs: markPaidPayment.associated_cardocs,
-        associated_fuel: markPaidPayment.associated_fuel,
-        associated_lease: markPaidPayment.associated_lease,
-        car_id: markPaidPayment.car_id,
-        amount: markPaidPayment.amount,
+      const payload: IncomeInput = {
+        lease_id: markPaidIncome.lease_id,
         ...updates,
       }
-      const updated = await api.updatePayment(markPaidPayment.id, payload)
-      setPayments((prev) => prev.map((payment) => (payment.id === updated.id ? updated : payment)))
-      setMarkPaidPayment(null)
+      const updated = await api.updateIncome(markPaidIncome.id, payload)
+      setIncomeRecords((prev) => prev.map((income) => (income.id === updated.id ? updated : income)))
+      setMarkPaidIncome(null)
     } catch (err) {
       setError(toApiError(err))
     } finally {
@@ -251,14 +242,14 @@ function IncomePage() {
             </thead>
             <tbody>
               {filteredRows.map((row, index) => {
-                const isPaid = row.payment?.status === 'paid'
+                const isPaid = row.income?.status === 'paid'
                 return (
                   <tr key={row.key}>
                     <td>{index + 1}</td>
                     <td>{carLabel(row.lease.car_id)}</td>
                     <td>{vendorLabel(row.lease.vendor_id)}</td>
                     <td>{row.month}</td>
-                    <td>{row.payment?.amount ?? row.lease.monthly_fare}</td>
+                    <td>{row.income?.amount ?? row.lease.monthly_fare}</td>
                     <td>
                       <span className={`status-badge ${isPaid ? 'paid' : 'unpaid'}`}>
                         {isPaid ? 'Received' : 'Not received'}
@@ -282,7 +273,7 @@ function IncomePage() {
                     </td>
                     <td>
                       <div className="data-table-actions">
-                        {row.payment && (
+                        {row.income && (
                           <button
                             type="button"
                             className="icon-btn"
@@ -293,24 +284,24 @@ function IncomePage() {
                             <ViewIcon />
                           </button>
                         )}
-                        {row.payment && (
+                        {row.income && (
                           <button
                             type="button"
                             className="icon-btn"
                             aria-label="Edit payment"
                             title="Edit"
-                            onClick={() => openEditDialog(row.payment as Payment)}
+                            onClick={() => openEditDialog(row.income as Income)}
                           >
                             <EditIcon />
                           </button>
                         )}
-                        {row.payment && (
+                        {row.income && (
                           <button
                             type="button"
                             className="icon-btn danger"
                             aria-label="Delete payment"
                             title="Delete"
-                            onClick={() => setPendingDelete(row.payment)}
+                            onClick={() => setPendingDelete(row.income)}
                           >
                             <DeleteIcon />
                           </button>
@@ -352,41 +343,41 @@ function IncomePage() {
               </div>
               <div>
                 <dt>Amount</dt>
-                <dd>{viewingRow.payment?.amount ?? viewingRow.lease.monthly_fare}</dd>
+                <dd>{viewingRow.income?.amount ?? viewingRow.lease.monthly_fare}</dd>
               </div>
               <div>
                 <dt>Status</dt>
                 <dd>
-                  <span className={`status-badge ${viewingRow.payment?.status === 'paid' ? 'paid' : 'unpaid'}`}>
-                    {viewingRow.payment?.status === 'paid' ? 'Received' : 'Not received'}
+                  <span className={`status-badge ${viewingRow.income?.status === 'paid' ? 'paid' : 'unpaid'}`}>
+                    {viewingRow.income?.status === 'paid' ? 'Received' : 'Not received'}
                   </span>
                 </dd>
               </div>
               <div>
                 <dt>Payment date</dt>
-                <dd>{viewingRow.payment?.payment_date ?? '—'}</dd>
+                <dd>{viewingRow.income?.payment_date ?? '—'}</dd>
               </div>
               <div>
                 <dt>Paid by</dt>
-                <dd>{viewingRow.payment?.paid_by || '—'}</dd>
+                <dd>{viewingRow.income?.paid_by || '—'}</dd>
               </div>
               <div>
                 <dt>Paid to</dt>
-                <dd>{viewingRow.payment?.paid_to || '—'}</dd>
+                <dd>{viewingRow.income?.paid_to || '—'}</dd>
               </div>
               <div>
                 <dt>Description</dt>
-                <dd>{viewingRow.payment?.description ?? '—'}</dd>
+                <dd>{viewingRow.income?.description ?? '—'}</dd>
               </div>
-              {viewingRow.payment && (
+              {viewingRow.income && (
                 <>
                   <div>
                     <dt>Created</dt>
-                    <dd>{new Date(viewingRow.payment.created_at).toLocaleString()}</dd>
+                    <dd>{new Date(viewingRow.income.created_at).toLocaleString()}</dd>
                   </div>
                   <div>
                     <dt>Last updated</dt>
-                    <dd>{new Date(viewingRow.payment.updated_at).toLocaleString()}</dd>
+                    <dd>{new Date(viewingRow.income.updated_at).toLocaleString()}</dd>
                   </div>
                 </>
               )}
@@ -395,12 +386,12 @@ function IncomePage() {
               <button type="button" className="secondary" onClick={() => setViewingRow(null)}>
                 Close
               </button>
-              {viewingRow.payment && (
+              {viewingRow.income && (
                 <button
                   type="button"
                   className="btn-primary"
                   onClick={() => {
-                    if (viewingRow.payment) openEditDialog(viewingRow.payment)
+                    if (viewingRow.income) openEditDialog(viewingRow.income)
                     setViewingRow(null)
                   }}
                 >
@@ -413,22 +404,23 @@ function IncomePage() {
       )}
 
       <MarkPaidDialog
-        open={markPaidPayment !== null}
-        payment={markPaidPayment}
-        carLabel={markPaidPayment ? carLabel(markPaidPayment.car_id) : ''}
+        open={markPaidIncome !== null}
+        payment={markPaidIncome}
+        carLabel={markPaidIncome ? carLabel(markPaidIncome.car_id) : ''}
         typeLabel="Monthly fare"
         title={dialogTitle}
         simple={isSimpleDialog}
+        paidByAsText
         isSaving={isMarkingPaid}
         onSave={confirmMarkPaid}
-        onCancel={() => setMarkPaidPayment(null)}
+        onCancel={() => setMarkPaidIncome(null)}
       />
 
       <ConfirmDialog
         open={pendingDelete !== null}
         title="Delete this monthly fare payment?"
         isConfirming={isDeleting}
-        onConfirm={confirmDeletePayment}
+        onConfirm={confirmDeleteIncome}
         onCancel={() => setPendingDelete(null)}
       />
 

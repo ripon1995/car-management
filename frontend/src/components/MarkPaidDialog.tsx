@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { PAID_BY_METHODS, type Payment, type PaymentStatus } from '../types/payment'
+import { PAID_BY_METHODS, type PaymentStatus } from '../types/payment'
 import Loader from './Loader'
 
 export interface MarkPaidUpdates {
@@ -10,9 +10,19 @@ export interface MarkPaidUpdates {
   description: string | null
 }
 
+/** Common shape both Payment and Income share — the fields this dialog reads/edits. */
+export interface MarkPaidTarget {
+  status: PaymentStatus
+  paid_by: string
+  paid_to: string
+  payment_date: string
+  description: string | null
+  amount: number | string
+}
+
 interface MarkPaidDialogProps {
   open: boolean
-  payment: Payment | null
+  payment: MarkPaidTarget | null
   carLabel: string
   typeLabel: string
   title?: string
@@ -20,6 +30,9 @@ interface MarkPaidDialogProps {
    * status confirmation where Amount/Car/Type/Paid by/Paid to are already
    * correct and don't need re-entry (e.g. Income's "mark as received"). */
   simple?: boolean
+  /** When true, "Paid by" renders as free text instead of the PAID_BY_METHODS
+   * select — e.g. Income's paid_by is a vendor name, not a payment method. */
+  paidByAsText?: boolean
   isSaving: boolean
   onSave: (updates: MarkPaidUpdates) => void
   onCancel: () => void
@@ -32,6 +45,7 @@ function MarkPaidDialog({
   typeLabel,
   title = 'Mark payment as paid',
   simple = false,
+  paidByAsText = false,
   isSaving,
   onSave,
   onCancel,
@@ -112,7 +126,7 @@ function MarkPaidDialog({
           <>
             <label className="form-field">
               <span className="form-field-label">Paid by</span>
-              {payment.type === 'monthly_fair' ? (
+              {paidByAsText ? (
                 <input type="text" value={paidBy} onChange={(event) => setPaidBy(event.target.value)} required />
               ) : (
                 <select value={paidBy} onChange={(event) => setPaidBy(event.target.value)} required>

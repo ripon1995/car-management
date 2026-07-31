@@ -1,6 +1,6 @@
 import { request, authHeaders } from './client'
 import type { DuePayments, Lease, LeaseInput } from '../types/lease'
-import type { Payment } from '../types/payment'
+import type { Income } from '../types/income'
 
 export interface LeaseFilters {
   carId?: string
@@ -48,8 +48,8 @@ export function getDuePayments(id: string): Promise<DuePayments> {
   return request<DuePayments>(`/leases/${id}/due-payments`, { headers: authHeaders() })
 }
 
-export function generateDuePayments(id: string): Promise<Payment[]> {
-  return request<Payment[]>(`/leases/${id}/generate-payments`, {
+export function generateDuePayments(id: string): Promise<Income[]> {
+  return request<Income[]>(`/leases/${id}/generate-payments`, {
     method: 'POST',
     headers: authHeaders(),
   })

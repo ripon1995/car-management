@@ -4,6 +4,7 @@ import ErrorDialog from '../components/ErrorDialog'
 import { ApiError } from '../errors/api'
 import * as api from '../api'
 import type { Car } from '../types/car'
+import type { Income } from '../types/income'
 import type { Payment } from '../types/payment'
 import type { RevenueSummary } from '../types/revenue'
 import Loader from '../components/Loader'
@@ -47,6 +48,14 @@ function formatDate(value: string) {
   const date = new Date(`${value}T00:00:00`)
   if (Number.isNaN(date.getTime())) return value
   return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
+interface DrillDownRow {
+  key: string
+  date: string
+  car_id: string
+  typeLabel: string
+  signed: number
 }
 
 function DonutChart({ summary }: { summary: RevenueSummary }) {
@@ -207,6 +216,7 @@ function DashboardPage() {
   const [dateTo, setDateTo] = useState('')
   const [summary, setSummary] = useState<RevenueSummary | null>(null)
   const [payments, setPayments] = useState<Payment[]>([])
+  const [incomeRecords, setIncomeRecords] = useState<Income[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<ApiError | null>(null)
 
@@ -238,19 +248,30 @@ function DashboardPage() {
   useEffect(() => {
     if (!filteredMode) {
       setPayments([])
+      setIncomeRecords([])
       return
     }
     let cancelled = false
-    api
-      .listPayments({
+    Promise.all([
+      api.listPayments({
         carId: carId || undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
         status: 'paid',
-      })
+      }),
+      api.listIncome({
+        carId: carId || undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+        status: 'paid',
+      }),
+    ])
       .catch(() => undefined)
-      .then((data) => {
-        if (!cancelled && data) setPayments(data)
+      .then((result) => {
+        if (cancelled || !result) return
+        const [paymentsData, incomeData] = result
+        setPayments(paymentsData)
+        setIncomeRecords(incomeData)
       })
     return () => {
       cancelled = true
@@ -262,18 +283,27 @@ function DashboardPage() {
     return (id: string) => map.get(id) ?? '—'
   }, [cars])
 
-  const sortedPayments = useMemo(
-    () => [...payments].sort((a, b) => a.payment_date.localeCompare(b.payment_date)),
-    [payments],
-  )
+  const drillDownRows = useMemo<DrillDownRow[]>(() => {
+    const paymentRows = payments.map((payment) => ({
+      key: payment.id,
+      date: payment.payment_date,
+      car_id: payment.car_id,
+      typeLabel: typeLabels[payment.type] ?? payment.type,
+      signed: -Number(payment.amount),
+    }))
+    const incomeRows = incomeRecords.map((income) => ({
+      key: income.id,
+      date: income.payment_date,
+      car_id: income.car_id,
+      typeLabel: typeLabels[INCOME_TYPE],
+      signed: Number(income.amount),
+    }))
+    return [...paymentRows, ...incomeRows].sort((a, b) => a.date.localeCompare(b.date))
+  }, [payments, incomeRecords])
 
   const paymentsNet = useMemo(
-    () =>
-      sortedPayments.reduce(
-        (sum, payment) => sum + (payment.type === INCOME_TYPE ? Number(payment.amount) : -Number(payment.amount)),
-        0,
-      ),
-    [sortedPayments],
+    () => drillDownRows.reduce((sum, row) => sum + row.signed, 0),
+    [drillDownRows],
   )
 
   return (
@@ -354,27 +384,23 @@ function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedPayments.length === 0 && (
+                  {drillDownRows.length === 0 && (
                     <tr>
                       <td colSpan={5}>No payments in range</td>
                     </tr>
                   )}
-                  {sortedPayments.map((payment, index) => {
-                    const signed =
-                      payment.type === INCOME_TYPE ? Number(payment.amount) : -Number(payment.amount)
-                    return (
-                      <tr key={payment.id}>
-                        <td>{index + 1}</td>
-                        <td>{formatDate(payment.payment_date)}</td>
-                        <td>{carLabel(payment.car_id)}</td>
-                        <td>{typeLabels[payment.type] ?? payment.type}</td>
-                        <td className={signed >= 0 ? 'good' : 'critical'}>
-                          {signed >= 0 ? '+' : '-'}
-                          {formatAmount(Math.abs(signed))}
-                        </td>
-                      </tr>
-                    )
-                  })}
+                  {drillDownRows.map((row, index) => (
+                    <tr key={row.key}>
+                      <td>{index + 1}</td>
+                      <td>{formatDate(row.date)}</td>
+                      <td>{carLabel(row.car_id)}</td>
+                      <td>{row.typeLabel}</td>
+                      <td className={row.signed >= 0 ? 'good' : 'critical'}>
+                        {row.signed >= 0 ? '+' : '-'}
+                        {formatAmount(Math.abs(row.signed))}
+                      </td>
+                    </tr>
+                  ))}
                   <tr className="net-row">
                     <td colSpan={4} className="net-row-label">
                       Net

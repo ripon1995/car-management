@@ -7,6 +7,7 @@ import * as api from '../api'
 import type { DuePayments, Lease } from '../types/lease'
 import type { Income, IncomeInput } from '../types/income'
 import { carDisplayLabel, type Car } from '../types/car'
+import type { CarOwner } from '../types/carOwner'
 import type { Vendor } from '../types/vendor'
 import Loader from '../components/Loader'
 import MarkPaidDialog, { type MarkPaidUpdates } from '../components/MarkPaidDialog'
@@ -26,6 +27,7 @@ function toApiError(err: unknown): ApiError {
 function IncomePage() {
   const [leases, setLeases] = useState<Lease[]>([])
   const [cars, setCars] = useState<Car[]>([])
+  const [carOwners, setCarOwners] = useState<CarOwner[]>([])
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [incomeRecords, setIncomeRecords] = useState<Income[]>([])
   const [dueByLease, setDueByLease] = useState<Map<string, DuePayments>>(new Map())
@@ -52,11 +54,12 @@ function IncomePage() {
   useEffect(() => {
     let cancelled = false
     setIsLoading(true)
-    Promise.all([api.listLeases(), api.listCars(), api.listVendors(), api.listIncome()])
-      .then(async ([leasesData, carsData, vendorsData, incomeData]) => {
+    Promise.all([api.listLeases(), api.listCars(), api.listCarOwners(), api.listVendors(), api.listIncome()])
+      .then(async ([leasesData, carsData, carOwnersData, vendorsData, incomeData]) => {
         if (cancelled) return
         setLeases(leasesData)
         setCars(carsData)
+        setCarOwners(carOwnersData)
         setVendors(vendorsData)
         setIncomeRecords(incomeData)
         await loadDueStatus(leasesData)
@@ -89,6 +92,12 @@ function IncomePage() {
 
   function vendorLabel(vendorId: string) {
     return vendors.find((v) => v.id === vendorId)?.name ?? '—'
+  }
+
+  function ownerLabel(carId: string) {
+    const car = cars.find((c) => c.id === carId)
+    if (!car) return '—'
+    return carOwners.find((o) => o.id === car.owner_id)?.name ?? '—'
   }
 
   function monthLabel(month: string) {
@@ -239,6 +248,7 @@ function IncomePage() {
               <tr>
                 <th>SL</th>
                 <th>Car</th>
+                <th>Owner</th>
                 <th>Vendor</th>
                 <th>Month</th>
                 <th>Amount</th>
@@ -254,6 +264,7 @@ function IncomePage() {
                   <tr key={row.key}>
                     <td>{index + 1}</td>
                     <td>{carLabel(row.lease.car_id)}</td>
+                    <td>{ownerLabel(row.lease.car_id)}</td>
                     <td>{vendorLabel(row.lease.vendor_id)}</td>
                     <td>{monthLabel(row.month)}</td>
                     <td>{row.income?.amount ?? row.lease.monthly_fare}</td>

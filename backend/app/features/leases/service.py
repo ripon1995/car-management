@@ -96,7 +96,7 @@ class LeaseService:
         all_months = _month_range(lease.start_date, effective_end)
 
         income_rows = await self.income_repository.list_all(lease_id=lease_id)
-        generated_months = sorted({row.payment_date.strftime("%Y-%m") for row in income_rows})
+        generated_months = sorted({row.period.strftime("%Y-%m") for row in income_rows})
         due_months = [month for month in all_months if month not in generated_months]
         return DuePaymentsRead(due_months=due_months, generated_months=generated_months)
 
@@ -117,6 +117,7 @@ class LeaseService:
                 lease_id=lease.id,
                 car_id=lease.car_id,
                 amount=lease.monthly_fare,
+                period=date(year, month_num, 1),
                 payment_date=date(year, month_num, 1),
                 paid_by=vendor.name,
                 paid_to=owner.name,

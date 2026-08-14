@@ -91,6 +91,13 @@ function IncomePage() {
     return vendors.find((v) => v.id === vendorId)?.name ?? '—'
   }
 
+  function monthLabel(month: string) {
+    const [year, monthNum] = month.split('-')
+    const date = new Date(Number(year), Number(monthNum) - 1, 1)
+    const formatted = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    return formatted.replace(' ', '-')
+  }
+
   const rows = useMemo<IncomeRow[]>(() => {
     const result: IncomeRow[] = []
     for (const lease of leases) {
@@ -100,7 +107,7 @@ function IncomePage() {
       for (const month of months) {
         const income =
           incomeRecords.find(
-            (i) => i.lease_id === lease.id && i.payment_date.slice(0, 7) === month,
+            (i) => i.lease_id === lease.id && i.period.slice(0, 7) === month,
           ) ?? null
         result.push({ key: `${lease.id}:${month}`, lease, month, income })
       }
@@ -134,7 +141,7 @@ function IncomePage() {
       setDueByLease((prev) => new Map(prev).set(row.lease.id, refreshedDue))
       setIncomeRecords(refreshedIncome)
       const newIncome = refreshedIncome.find(
-        (i) => i.lease_id === row.lease.id && i.payment_date.slice(0, 7) === row.month,
+        (i) => i.lease_id === row.lease.id && i.period.slice(0, 7) === row.month,
       )
       if (newIncome) {
         setDialogTitle('Mark as received')
@@ -248,7 +255,7 @@ function IncomePage() {
                     <td>{index + 1}</td>
                     <td>{carLabel(row.lease.car_id)}</td>
                     <td>{vendorLabel(row.lease.vendor_id)}</td>
-                    <td>{row.month}</td>
+                    <td>{monthLabel(row.month)}</td>
                     <td>{row.income?.amount ?? row.lease.monthly_fare}</td>
                     <td>
                       <span className={`status-badge ${isPaid ? 'paid' : 'unpaid'}`}>
@@ -326,7 +333,7 @@ function IncomePage() {
             onClick={(event) => event.stopPropagation()}
           >
             <h2 id="income-view-title">
-              {carLabel(viewingRow.lease.car_id)} — {viewingRow.month}
+              {carLabel(viewingRow.lease.car_id)} — {monthLabel(viewingRow.month)}
             </h2>
             <dl className="detail-list">
               <div>
@@ -339,7 +346,7 @@ function IncomePage() {
               </div>
               <div>
                 <dt>Month</dt>
-                <dd>{viewingRow.month}</dd>
+                <dd>{monthLabel(viewingRow.month)}</dd>
               </div>
               <div>
                 <dt>Amount</dt>

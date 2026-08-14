@@ -9,6 +9,7 @@ INCOME_STATUSES = ("paid", "unpaid")
 
 class IncomeCreate(BaseModel):
     lease_id: uuid.UUID
+    period: date
     payment_date: date
     paid_by: str
     paid_to: str
@@ -17,6 +18,8 @@ class IncomeCreate(BaseModel):
 
 
 class IncomeUpdate(BaseModel):
+    # period is intentionally not settable here — it's the rent month this row covers and is
+    # fixed at creation; only payment_date/status/paid_by/paid_to/description can change later.
     lease_id: uuid.UUID | None = None
     payment_date: date | None = None
     paid_by: str | None = None
@@ -32,6 +35,7 @@ class IncomeRead(BaseModel):
     lease_id: uuid.UUID
     car_id: uuid.UUID
     amount: Decimal
+    period: date
     payment_date: date
     paid_by: str
     paid_to: str
